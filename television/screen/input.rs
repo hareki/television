@@ -121,7 +121,7 @@ pub fn draw_input_box(
 
     let result_count_block = Block::default();
     let result_count_paragraph = Paragraph::new(Span::styled(
-        format!(" {} / {} ", results_count, total_count),
+        format!(" {}/{} ", results_count, total_count),
         Style::default()
             .fg(colorscheme.input.results_count_fg)
             .italic(),
