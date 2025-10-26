@@ -220,6 +220,12 @@ impl LayeredConfig {
                 .and_then(|ui| ui.orientation)
                 .unwrap_or(self.base_config.ui.orientation),
         );
+        let merge_input_and_results = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.merge_input_and_results)
+            .unwrap_or(self.base_config.ui.merge_input_and_results);
         let input_bar_header = self
             .channel_cli
             .input_header
@@ -462,6 +468,7 @@ impl LayeredConfig {
             inline,
             height,
             width,
+            merge_input_and_results,
             // input bar
             input_bar_position,
             input_bar_header,
@@ -554,6 +561,7 @@ pub struct MergedConfig {
     pub inline: bool,
     pub height: Option<u16>,
     pub width: Option<u16>,
+    pub merge_input_and_results: bool,
     // input bar
     pub input_bar_position: InputPosition,
     pub input_bar_header: Option<String>,

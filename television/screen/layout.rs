@@ -169,6 +169,7 @@ impl Layout {
             Constraint::Length(input_bar_height(
                 merged_config.input_bar_padding,
                 merged_config.input_bar_border_type,
+                merged_config.merge_input_and_results,
             )),
         ];
 
@@ -195,9 +196,13 @@ impl Layout {
             // In portrait orientation, reserve the input bar height from the total
             // vertical space before applying the percentage split so the preview
             // takes the intended share of *usable* height.
+            // However, when merge_input_and_results is true, the input and results
+            // are visually merged, so we treat them as a single unit and don't need
+            // to adjust the percentage calculation.
             let mut preview_percentage = raw_preview_percentage;
             if merged_config.layout == Orientation::Portrait
                 && input_bar_height > 0
+                && !merged_config.merge_input_and_results
             {
                 let total_height = main_rect.height;
                 if total_height > input_bar_height {
@@ -286,6 +291,11 @@ impl Layout {
                 // vertical split so percentages are applied correctly without the
                 // need for post-hoc adjustments.
 
+                // When merge_input_and_results is true, we treat input+results as
+                // a single merged unit for layout purposes
+                let treat_as_merged =
+                    merged_config.merge_input_and_results && !preview_hidden;
+
                 // Index helpers
                 let (input_idx, results_idx, preview_idx): (
                     usize,
@@ -297,62 +307,92 @@ impl Layout {
 
                 match merged_config.input_bar_position {
                     InputPosition::Top => {
-                        // Input bar is always the first chunk
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = 0;
-
-                        if preview_hidden {
-                            // only results
-                            portrait_constraints.push(Constraint::Fill(1));
-                            results_idx = 1;
-                            preview_idx = None;
-                        } else {
-                            // results then preview
+                        if treat_as_merged {
+                            // When merging, input+results are a single percentage chunk
                             portrait_constraints
                                 .push(Constraint::Percentage(100));
+                            input_idx = 0;
+                            results_idx = 0; // Same rect, will be split internally
+
+                            // Preview
                             portrait_constraints
                                 .push(Constraint::Percentage(0));
-                            results_idx = 1;
-                            preview_idx = Some(2);
+                            preview_idx = Some(1);
+                        } else {
+                            // Original behavior: input is fixed height
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = 0;
+
+                            if preview_hidden {
+                                // only results
+                                portrait_constraints.push(Constraint::Fill(1));
+                                results_idx = 1;
+                                preview_idx = None;
+                            } else {
+                                // results then preview
+                                portrait_constraints
+                                    .push(Constraint::Percentage(100));
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                results_idx = 1;
+                                preview_idx = Some(2);
+                            }
                         }
                     }
                     InputPosition::Bottom => {
-                        // For bottom input bar we might put preview at the top if
-                        // present, then results, then input.
-                        if preview_hidden {
-                            preview_idx = None;
-                        } else {
+                        if treat_as_merged {
+                            // Preview first
                             portrait_constraints
                                 .push(Constraint::Percentage(0));
                             preview_idx = Some(0);
+
+                            // Then merged input+results
+                            portrait_constraints
+                                .push(Constraint::Percentage(100));
+                            results_idx = 1;
+                            input_idx = 1; // Same rect, will be split internally
+                        } else {
+                            // Original behavior
+                            // For bottom input bar we might put preview at the top if
+                            // present, then results, then input.
+                            if preview_hidden {
+                                preview_idx = None;
+                            } else {
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                preview_idx = Some(0);
+                            }
+
+                            // results (placeholder percentage)
+                            portrait_constraints
+                                .push(Constraint::Percentage(100));
+                            results_idx = usize::from(!preview_hidden);
+
+                            // finally the input bar
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = portrait_constraints.len() - 1;
                         }
-
-                        // results (placeholder percentage)
-                        portrait_constraints.push(Constraint::Percentage(100));
-                        results_idx = usize::from(!preview_hidden);
-
-                        // finally the input bar
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = portrait_constraints.len() - 1;
                     }
                 }
 
-                // If preview is enabled, calculate the concrete percentages now
+                // If preview is enabled, calculate concrete sizes now
                 if let Some(p_idx) = preview_idx {
                     // Determine preview percentage from config
-                    let preview_pct =
-                        merged_config.preview_panel_size.clamp(1, 99);
+                    let preview_pct = merged_config.preview_panel_size.clamp(1, 99);
 
-                    // Remaining for results
-                    let results_pct = 100u16.saturating_sub(preview_pct);
+                    // Compute absolute heights to avoid rounding bias
+                    let total_h = main_rect.height;
+                    let preview_h: u16 = ((u32::from(total_h) * u32::from(preview_pct) + 50)
+                        / 100)
+                        .try_into()
+                        .unwrap_or(0);
+                    let results_h = total_h.saturating_sub(preview_h);
 
-                    // Assign
-                    portrait_constraints[results_idx] =
-                        Constraint::Percentage(results_pct);
-                    portrait_constraints[p_idx] =
-                        Constraint::Percentage(preview_pct);
+                    // Assign exact lengths for consistent split
+                    portrait_constraints[results_idx] = Constraint::Length(results_h);
+                    portrait_constraints[p_idx] = Constraint::Length(preview_h);
                 } else {
                     // preview disabled: results takes the remaining space
                     portrait_constraints[results_idx] = Constraint::Fill(1);
@@ -364,8 +404,39 @@ impl Layout {
                     .constraints(portrait_constraints)
                     .split(main_rect);
 
-                let input_rect = portrait_chunks[input_idx];
-                let results_rect = portrait_chunks[results_idx];
+                let (input_rect, results_rect) = if treat_as_merged {
+                    // When merged, we need to split the merged chunk into input and results
+                    let merged_rect = portrait_chunks[input_idx]; // input_idx == results_idx when merged
+                    let merged_constraints =
+                        match merged_config.input_bar_position {
+                            InputPosition::Top => vec![
+                                Constraint::Length(input_bar_height),
+                                Constraint::Fill(1),
+                            ],
+                            InputPosition::Bottom => vec![
+                                Constraint::Fill(1),
+                                Constraint::Length(input_bar_height),
+                            ],
+                        };
+
+                    let merged_chunks = layout::Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints(merged_constraints)
+                        .split(merged_rect);
+
+                    match merged_config.input_bar_position {
+                        InputPosition::Top => {
+                            (merged_chunks[0], merged_chunks[1])
+                        }
+                        InputPosition::Bottom => {
+                            (merged_chunks[1], merged_chunks[0])
+                        }
+                    }
+                } else {
+                    // Original behavior: input and results are separate
+                    (portrait_chunks[input_idx], portrait_chunks[results_idx])
+                };
+
                 let preview_rect = preview_idx.map(|idx| portrait_chunks[idx]);
 
                 (input_rect, results_rect, preview_rect)
@@ -476,12 +547,17 @@ fn bottom_right_rect(width: u16, height: u16, r: Rect) -> Rect {
     }
 }
 
-fn input_bar_height(padding: Padding, border_type: BorderType) -> u16 {
+fn input_bar_height(
+    padding: Padding,
+    border_type: BorderType,
+    merge_with_results: bool,
+) -> u16 {
     // input line + header + vertical padding
     let mut h = 1 + 1 + padding.top + padding.bottom;
 
     // add the bottom border if applicable (top is already included with the header)
-    if border_type != BorderType::None {
+    // unless we're merging with results panel, in which case we share the border
+    if border_type != BorderType::None && !merge_with_results {
         h += 1;
     }
     h
@@ -499,7 +575,7 @@ mod tests {
     /// --------
     fn test_input_bar_height_with_borders() {
         assert_eq!(
-            input_bar_height(Padding::default(), BorderType::Rounded),
+            input_bar_height(Padding::default(), BorderType::Rounded, false),
             3
         );
     }
@@ -508,7 +584,10 @@ mod tests {
     ///      h
     ///    input
     fn test_input_bar_height_without_borders() {
-        assert_eq!(input_bar_height(Padding::default(), BorderType::None,), 2);
+        assert_eq!(
+            input_bar_height(Padding::default(), BorderType::None, false),
+            2
+        );
     }
 
     #[test]
@@ -521,7 +600,8 @@ mod tests {
                     left: 0,
                     right: 0,
                 },
-                BorderType::None
+                BorderType::None,
+                false
             ),
             5
         );

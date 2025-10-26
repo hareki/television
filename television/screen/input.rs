@@ -34,6 +34,7 @@ pub fn draw_input_box(
     padding: &Padding,
     border_type: &BorderType,
     prompt: Option<&String>,
+    merge_with_results: bool,
 ) -> Result<()> {
     // Header behavior:
     // - None => use default channel name
@@ -67,8 +68,22 @@ pub fn draw_input_box(
         );
     }
     if let Some(b) = border_type.to_ratatui_border_type() {
+        // When merging with results, exclude the bottom border for top position
+        // or the top border for bottom position
+        let borders = if merge_with_results {
+            match position {
+                InputPosition::Top => {
+                    Borders::TOP | Borders::LEFT | Borders::RIGHT
+                }
+                InputPosition::Bottom => {
+                    Borders::BOTTOM | Borders::LEFT | Borders::RIGHT
+                }
+            }
+        } else {
+            Borders::ALL
+        };
         input_block = input_block
-            .borders(Borders::ALL)
+            .borders(borders)
             .border_type(b)
             .border_style(Style::default().fg(colorscheme.general.border_fg));
     }
