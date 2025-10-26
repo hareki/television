@@ -510,6 +510,12 @@ impl Television {
     ) -> Result<()> {
         if selected_entry.is_none() {
             self.preview_state.reset();
+            // If user configured an empty preview header, suppress the default title
+            if let Some(template) = &self.merged_config.preview_panel_header {
+                if template.raw().is_empty() {
+                    self.preview_state.preview.title.clear();
+                }
+            }
             return Ok(());
         }
         if let Some((sender, receiver)) = &mut self.preview_handles {

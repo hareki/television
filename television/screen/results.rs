@@ -24,14 +24,26 @@ pub fn draw_results_list(
     colorscheme: &Colorscheme,
     results_panel_padding: &Padding,
     results_panel_border_type: &BorderType,
+    header: &Option<String>,
 ) -> Result<()> {
     let mut results_block = Block::default()
-        .title_top(Line::from(" Results ").alignment(Alignment::Center))
         .style(
             Style::default()
                 .bg(colorscheme.general.background.unwrap_or_default()),
         )
         .padding(RatatuiPadding::from(*results_panel_padding));
+
+    // Header: if Some("") => no header; if Some(non-empty) => use it; if None => use default " Results "
+    if let Some(h) = header {
+        if !h.is_empty() {
+            results_block = results_block.title_top(
+                Line::from(format!(" {} ", h)).alignment(Alignment::Center),
+            );
+        }
+    } else {
+        results_block = results_block
+            .title_top(Line::from(" Results ").alignment(Alignment::Center));
+    }
     if let Some(border_type) =
         results_panel_border_type.to_ratatui_border_type()
     {

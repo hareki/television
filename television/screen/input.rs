@@ -35,22 +35,37 @@ pub fn draw_input_box(
     border_type: &BorderType,
     prompt: Option<&String>,
 ) -> Result<()> {
-    let header = header.as_ref().map_or(channel_name, |v| v);
+    // Header behavior:
+    // - None => use default channel name
+    // - Some("") => no header
+    // - Some(non-empty) => use value
     let mut input_block = Block::default()
         .title_position(match position {
             InputPosition::Top => Position::Top,
             InputPosition::Bottom => Position::Bottom,
         })
-        .title(
-            Line::from(format!(" {} ", header))
-                .style(Style::default().fg(colorscheme.mode.channel).bold())
-                .centered(),
-        )
         .style(
             Style::default()
                 .bg(colorscheme.general.background.unwrap_or_default()),
         )
         .padding(RatatuiPadding::from(*padding));
+    if let Some(h) = header {
+        if !h.is_empty() {
+            input_block = input_block.title(
+                Line::from(format!(" {} ", h))
+                    .style(
+                        Style::default().fg(colorscheme.mode.channel).bold(),
+                    )
+                    .centered(),
+            );
+        }
+    } else {
+        input_block = input_block.title(
+            Line::from(format!(" {} ", channel_name))
+                .style(Style::default().fg(colorscheme.mode.channel).bold())
+                .centered(),
+        );
+    }
     if let Some(b) = border_type.to_ratatui_border_type() {
         input_block = input_block
             .borders(Borders::ALL)

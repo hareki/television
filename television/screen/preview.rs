@@ -172,27 +172,28 @@ fn draw_content_outer_block(
     padding: Padding,
     preview: &Preview,
 ) -> Rect {
-    let mut preview_title_spans = vec![Span::from(" ")];
-    // preview header
-    preview_title_spans.push(Span::styled(
-        shrink_with_ellipsis(
-            &replace_non_printable(
-                preview.title.as_bytes(),
-                &ReplaceNonPrintableConfig::default(),
-            )
-            .0,
-            rect.width.saturating_sub(4) as usize,
-        ),
-        Style::default().fg(colorscheme.preview.title_fg).bold(),
-    ));
-    preview_title_spans.push(Span::from(" "));
-
     let mut block = Block::default();
-    block = block.title_top(
-        Line::from(preview_title_spans)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(colorscheme.preview.title_fg)),
-    );
+    // preview header: if title is empty => no header; else show centered title
+    if !preview.title.is_empty() {
+        let mut preview_title_spans = vec![Span::from(" ")];
+        preview_title_spans.push(Span::styled(
+            shrink_with_ellipsis(
+                &replace_non_printable(
+                    preview.title.as_bytes(),
+                    &ReplaceNonPrintableConfig::default(),
+                )
+                .0,
+                rect.width.saturating_sub(4) as usize,
+            ),
+            Style::default().fg(colorscheme.preview.title_fg).bold(),
+        ));
+        preview_title_spans.push(Span::from(" "));
+        block = block.title_top(
+            Line::from(preview_title_spans)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(colorscheme.preview.title_fg)),
+        );
+    }
 
     // preview footer
     if !preview.footer.is_empty() {
