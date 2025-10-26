@@ -818,6 +818,40 @@ header = "{strip_ansi|split:\\::..2}"
 
 ---
 
+### *tldr*
+
+Browse and preview TLDR help pages for command-line tools
+
+![tv running the tldr channel](../../assets/channels/tldr.png)
+**Requirements:** `tldr`
+
+**Code:** *tldr.toml*
+
+```toml
+[metadata]
+name = "tldr"
+description = "Browse and preview TLDR help pages for command-line tools"
+requirements = [ "tldr",]
+
+[source]
+command = "tldr --list"
+
+[preview]
+command = "tldr '{0}'"
+
+[keybindings]
+ctrl-e = "actions:open"
+
+[actions.open]
+description = "Open the selected TLDR page"
+command = "tldr '{0}'"
+mode = "execute"
+
+```
+
+
+---
+
 ### *zsh-history*
 
 A channel to select from your zsh history
