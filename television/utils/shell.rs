@@ -256,7 +256,7 @@ mod tests {
         let shell = Shell::Fish;
         let result = ctrl_keybinding(shell, character);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "\\cs");
+        assert_eq!(result.unwrap(), "ctrl-s");
     }
 
     #[test]
