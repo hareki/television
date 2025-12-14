@@ -269,6 +269,13 @@ impl ConfigLayers {
                     .is_some_and(|sb| sb.hidden)
                 || self.base_config.ui.status_bar.hidden
         };
+        let results_panel_header = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.results_panel.as_ref())
+            .and_then(|rp| rp.header.clone())
+            .or_else(|| self.base_config.ui.results_panel.header.clone());
         let results_panel_border_type = self
             .channel_cli
             .results_border
@@ -477,6 +484,7 @@ impl ConfigLayers {
             status_bar_hidden,
             status_bar_disabled,
             // results panel
+            results_panel_header,
             results_panel_border_type,
             results_panel_padding,
             // preview panel
@@ -570,6 +578,7 @@ pub struct MergedConfig {
     pub status_bar_hidden: bool,
     pub status_bar_disabled: bool,
     // results panel
+    pub results_panel_header: Option<String>,
     pub results_panel_border_type: BorderType,
     pub results_panel_padding: Padding,
     // preview panel

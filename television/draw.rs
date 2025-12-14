@@ -187,6 +187,7 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
         &ctx.colorscheme,
         &ctx.config.results_panel_padding,
         &ctx.config.results_panel_border_type,
+        &ctx.config.results_panel_header,
     )?;
 
     draw_input_box(

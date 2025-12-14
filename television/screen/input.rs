@@ -24,7 +24,7 @@ pub fn draw_input_box(
     results_count: u32,
     total_count: u32,
     input_state: &Input,
-    results_picker_state: &ListState,
+    _results_picker_state: &ListState,
     matcher_running: bool,
     channel_name: &str,
     spinner: &Spinner,

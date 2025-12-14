@@ -123,27 +123,30 @@ fn draw_content_outer_block(
     preview_title: &str,
     preview_footer: Option<String>,
 ) -> Rect {
-    let mut preview_title_spans = vec![Span::from(SPACE)];
-    // preview header
-    preview_title_spans.push(Span::styled(
-        shrink_with_ellipsis(
-            &replace_non_printable_bulk(
-                preview_title.as_bytes(),
-                &ReplaceNonPrintableConfig::default(),
-            )
-            .0,
-            rect.width.saturating_sub(4) as usize,
-        ),
-        Style::default().fg(colorscheme.preview.title_fg).bold(),
-    ));
-    preview_title_spans.push(Span::from(SPACE));
-
     let mut block = Block::default();
-    block = block.title_top(
-        Line::from(preview_title_spans)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(colorscheme.preview.title_fg)),
-    );
+
+    if !preview_title.is_empty() {
+        let mut preview_title_spans = vec![Span::from(SPACE)];
+        // preview header
+        preview_title_spans.push(Span::styled(
+            shrink_with_ellipsis(
+                &replace_non_printable_bulk(
+                    preview_title.as_bytes(),
+                    &ReplaceNonPrintableConfig::default(),
+                )
+                .0,
+                rect.width.saturating_sub(4) as usize,
+            ),
+            Style::default().fg(colorscheme.preview.title_fg).bold(),
+        ));
+        preview_title_spans.push(Span::from(SPACE));
+
+        block = block.title_top(
+            Line::from(preview_title_spans)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(colorscheme.preview.title_fg)),
+        );
+    }
 
     // preview footer
     if let Some(preview_footer) = preview_footer {
