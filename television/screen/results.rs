@@ -25,6 +25,7 @@ pub fn draw_results_list(
     results_panel_padding: &Padding,
     results_panel_border_type: &BorderType,
     results_panel_header: &Option<String>,
+    merge_input_and_results: bool,
 ) -> Result<()> {
     let mut results_block = Block::default()
         .style(
@@ -33,22 +34,34 @@ pub fn draw_results_list(
         )
         .padding(RatatuiPadding::from(*results_panel_padding));
 
-    if let Some(header) = results_panel_header {
-        if !header.is_empty() {
+    if !merge_input_and_results {
+        if let Some(header) = results_panel_header {
+            if !header.is_empty() {
+                results_block = results_block.title_top(
+                    Line::from(format!(" {} ", header))
+                        .alignment(Alignment::Center),
+                );
+            }
+        } else {
             results_block = results_block.title_top(
-                Line::from(format!(" {} ", header)).alignment(Alignment::Center),
+                Line::from(" Results ").alignment(Alignment::Center),
             );
         }
-    } else {
-        results_block = results_block
-            .title_top(Line::from(" Results ").alignment(Alignment::Center));
     }
 
     if let Some(border_type) =
         results_panel_border_type.to_ratatui_border_type()
     {
+        let mut borders = Borders::ALL;
+
+        if merge_input_and_results {
+            match input_bar_position {
+                InputPosition::Top => borders.remove(Borders::TOP),
+                InputPosition::Bottom => borders.remove(Borders::BOTTOM),
+            }
+        }
         results_block = results_block
-            .borders(Borders::ALL)
+            .borders(borders)
             .border_type(border_type)
             .border_style(Style::default().fg(colorscheme.general.border_fg));
     }

@@ -188,6 +188,7 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
         &ctx.config.results_panel_padding,
         &ctx.config.results_panel_border_type,
         &ctx.config.results_panel_header,
+        ctx.config.merge_input_and_results,
     )?;
 
     draw_input_box(
@@ -206,6 +207,7 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
         &ctx.config.input_bar_padding,
         &ctx.config.input_bar_border_type,
         ctx.config.input_bar_prompt.as_ref(),
+        ctx.config.merge_input_and_results,
     )?;
 
     // status bar at the bottom

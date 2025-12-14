@@ -224,6 +224,12 @@ impl ConfigLayers {
                 .and_then(|ui| ui.orientation)
                 .unwrap_or(self.base_config.ui.orientation),
         );
+        let merge_input_and_results = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.merge_input_and_results)
+            .unwrap_or(self.base_config.ui.merge_input_and_results);
         let input_bar_header = self
             .channel_cli
             .input_header
@@ -470,6 +476,7 @@ impl ConfigLayers {
             layout,
             theme,
             inline,
+            merge_input_and_results,
             height,
             width,
             // input bar
@@ -564,6 +571,7 @@ pub struct MergedConfig {
     pub layout: Orientation,
     pub theme: String,
     pub inline: bool,
+    pub merge_input_and_results: bool,
     pub height: Option<u16>,
     pub width: Option<u16>,
     // input bar

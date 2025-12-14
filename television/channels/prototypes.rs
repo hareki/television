@@ -425,6 +425,8 @@ pub struct UiSpec {
     #[serde(default)]
     pub theme: Option<String>,
     #[serde(default)]
+    pub merge_input_and_results: Option<bool>,
+    #[serde(default)]
     pub theme_overrides: ThemeOverrides,
     // Feature-specific configurations
     #[serde(default)]
@@ -449,6 +451,7 @@ impl From<&crate::config::UiConfig> for UiSpec {
             ui_scale: Some(config.ui_scale),
             orientation: Some(config.orientation),
             theme: Some(config.theme.clone()),
+            merge_input_and_results: Some(config.merge_input_and_results),
             theme_overrides: config.theme_overrides.clone(),
             input_bar: Some(config.input_bar.clone()),
             preview_panel: Some(config.preview_panel.clone()),

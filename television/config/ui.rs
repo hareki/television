@@ -191,6 +191,8 @@ pub struct UiConfig {
     pub ui_scale: u16,
     pub orientation: Orientation,
     pub theme: String,
+    #[serde(default)]
+    pub merge_input_and_results: bool,
 
     // Feature-specific configurations
     pub input_bar: InputBarConfig,
@@ -211,6 +213,7 @@ impl Default for UiConfig {
             ui_scale: DEFAULT_UI_SCALE,
             orientation: Orientation::Landscape,
             theme: String::from(DEFAULT_THEME),
+            merge_input_and_results: false,
             input_bar: InputBarConfig::default(),
             status_bar: StatusBarConfig::default(),
             preview_panel: PreviewPanelConfig::default(),

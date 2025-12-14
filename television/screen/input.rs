@@ -10,6 +10,7 @@ use ratatui::{
         Alignment, Constraint, Direction, Layout as RatatuiLayout, Rect,
     },
     style::{Style, Stylize},
+    symbols,
     text::{Line, Span},
     widgets::{
         Block, Borders, ListState, Padding as RatatuiPadding, Paragraph,
@@ -34,6 +35,7 @@ pub fn draw_input_box(
     padding: &Padding,
     border_type: &BorderType,
     prompt: Option<&String>,
+    merge_input_and_results: bool,
 ) -> Result<()> {
     let header = header.as_ref().map_or(channel_name, |v| v);
     let mut input_block = Block::default()
@@ -51,9 +53,28 @@ pub fn draw_input_box(
                 .bg(colorscheme.general.background.unwrap_or_default()),
         )
         .padding(RatatuiPadding::from(*padding));
+    let mut draw_bottom_separator = false;
+    let mut overwrite_top_corners = false;
+
     if let Some(b) = border_type.to_ratatui_border_type() {
+        let mut borders = Borders::ALL;
+
+        if merge_input_and_results {
+            match position {
+                InputPosition::Top => {
+                    borders.remove(Borders::BOTTOM);
+                    draw_bottom_separator = true;
+                }
+                InputPosition::Bottom => {
+                    // Input is at bottom. Results is at top.
+                    // Results panel removes its bottom border.
+                    // We keep our top border to serve as separator, but we need to fix the corners.
+                    overwrite_top_corners = true;
+                }
+            }
+        }
         input_block = input_block
-            .borders(Borders::ALL)
+            .borders(borders)
             .border_type(b)
             .border_style(Style::default().fg(colorscheme.general.border_fg));
     }
@@ -64,6 +85,57 @@ pub fn draw_input_box(
     }
 
     f.render_widget(input_block, rect);
+
+    if border_type.to_ratatui_border_type().is_some() {
+        let border_set = match border_type {
+            BorderType::Plain => symbols::border::PLAIN,
+            BorderType::Rounded => symbols::border::ROUNDED,
+            BorderType::Thick => symbols::border::THICK,
+            BorderType::None => symbols::border::PLAIN,
+        };
+
+        if draw_bottom_separator {
+            let bottom_y = rect.bottom() - 1;
+            let line = Line::from(vec![
+                Span::styled(
+                    border_set.vertical_right,
+                    Style::default().fg(colorscheme.general.border_fg),
+                ),
+                Span::styled(
+                    border_set
+                        .horizontal_top
+                        .to_string()
+                        .repeat((rect.width.saturating_sub(2)) as usize),
+                    Style::default().fg(colorscheme.general.border_fg),
+                ),
+                Span::styled(
+                    border_set.vertical_left,
+                    Style::default().fg(colorscheme.general.border_fg),
+                ),
+            ]);
+            f.render_widget(
+                Paragraph::new(line),
+                Rect::new(rect.x, bottom_y, rect.width, 1),
+            );
+        }
+
+        if overwrite_top_corners {
+            f.render_widget(
+                Paragraph::new(Span::styled(
+                    border_set.vertical_right,
+                    Style::default().fg(colorscheme.general.border_fg),
+                )),
+                Rect::new(rect.x, rect.y, 1, 1),
+            );
+            f.render_widget(
+                Paragraph::new(Span::styled(
+                    border_set.vertical_left,
+                    Style::default().fg(colorscheme.general.border_fg),
+                )),
+                Rect::new(rect.right() - 1, rect.y, 1, 1),
+            );
+        }
+    }
 
     // split input block into 4 parts: prompt symbol, input, result count, spinner
     let inner_input_chunks = RatatuiLayout::default()
