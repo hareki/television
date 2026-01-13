@@ -9,7 +9,7 @@ use crate::{
     },
     errors::cli_parsing_error_exit,
     event::Key,
-    screen::layout::Orientation,
+    screen::layout::{InputPosition, Orientation},
     utils::paths::expand_tilde,
 };
 use anyhow::{Result, anyhow};
@@ -70,6 +70,7 @@ pub struct ChannelCli {
     pub source_entry_delimiter: Option<char>,
     pub autocomplete_prompt: Option<String>,
     pub ansi: bool,
+    pub no_sort: bool,
 
     // Preview configuration
     pub preview_command: Option<Template>,
@@ -83,6 +84,7 @@ pub struct ChannelCli {
     pub preview_footer: Option<Template>,
     pub preview_border: Option<BorderType>,
     pub preview_padding: Option<Padding>,
+    pub preview_word_wrap: bool,
     pub hide_preview_scrollbar: bool,
 
     // Results panel configuration
@@ -105,6 +107,7 @@ pub struct ChannelCli {
     pub input: Option<String>,
     pub input_header: Option<String>,
     pub input_prompt: Option<String>,
+    pub input_position: Option<InputPosition>,
     pub input_border: Option<BorderType>,
     pub input_padding: Option<Padding>,
 
@@ -280,6 +283,7 @@ pub fn post_process(cli: Cli, readable_stdin: bool) -> PostProcessedCli {
 
     // Determine layout
     let layout: Option<Orientation> = cli.layout.map(Orientation::from);
+    let input_position = cli.input_position.map(InputPosition::from);
 
     // borders
     let input_border = cli.input_border.map(BorderType::from);
@@ -308,6 +312,7 @@ pub fn post_process(cli: Cli, readable_stdin: bool) -> PostProcessedCli {
             source_display,
             source_output,
             source_entry_delimiter,
+            no_sort: cli.no_sort,
 
             // Autocomplete and ANSI configuration
             autocomplete_prompt: cli.autocomplete_prompt,
@@ -321,6 +326,7 @@ pub fn post_process(cli: Cli, readable_stdin: bool) -> PostProcessedCli {
             hide_preview: cli.hide_preview,
             show_preview: cli.show_preview,
             hide_preview_scrollbar: cli.hide_preview_scrollbar,
+            preview_word_wrap: cli.preview_word_wrap,
             preview_size: cli.preview_size,
             preview_header,
             preview_footer,
@@ -347,6 +353,7 @@ pub fn post_process(cli: Cli, readable_stdin: bool) -> PostProcessedCli {
             input: cli.input,
             input_header: cli.input_header,
             input_prompt: cli.input_prompt,
+            input_position,
             input_border,
             input_padding,
 
