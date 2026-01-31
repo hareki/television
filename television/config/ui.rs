@@ -155,6 +155,8 @@ pub struct ThemeOverrides {
     pub channel_mode_bg: Option<String>,
     pub remote_control_mode_fg: Option<String>,
     pub remote_control_mode_bg: Option<String>,
+    pub action_picker_mode_fg: Option<String>,
+    pub action_picker_mode_bg: Option<String>,
 }
 
 impl ThemeOverrides {
@@ -183,6 +185,12 @@ impl ThemeOverrides {
             remote_control_mode_bg: self
                 .remote_control_mode_bg
                 .or(other.remote_control_mode_bg),
+            action_picker_mode_fg: self
+                .action_picker_mode_fg
+                .or(other.action_picker_mode_fg),
+            action_picker_mode_bg: self
+                .action_picker_mode_bg
+                .or(other.action_picker_mode_bg),
         }
     }
 }

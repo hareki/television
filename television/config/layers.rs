@@ -10,6 +10,7 @@ use crate::{
     },
     keymap::InputMap,
     screen::layout::{InputPosition, Orientation},
+    utils::shell::Shell,
 };
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
@@ -71,6 +72,8 @@ impl ConfigLayers {
         let default_channel =
             self.base_config.application.default_channel.clone();
         let history_size = self.base_config.application.history_size;
+        let frecency_max_entries =
+            self.base_config.application.frecency_max_entries;
         let theme = self.base_config.ui.theme.clone();
         let shell_integration_commands =
             self.base_config.shell_integration.commands.clone();
@@ -99,27 +102,37 @@ impl ConfigLayers {
             .channel_cli
             .watch_interval
             .unwrap_or(self.channel.watch);
-        // only sort results if --no-sort is not set and channel config has it enabled
-        let sort_results =
-            !self.channel_cli.no_sort && self.channel.source.sort_results;
+        // Determine if sorting is disabled: --no-sort CLI flag OR channel config
+        let no_sort = self.channel_cli.no_sort || self.channel.source.no_sort;
         let channel_name = self
             .channel_cli
             .channel
             .as_ref()
             .unwrap_or(&self.channel.metadata.name)
             .clone();
-        let channel_source_command =
+
+        // Global shell from base config (channel-specific shell overrides this)
+        let global_shell = self.base_config.application.shell;
+
+        // Build source command and apply global shell if no channel-specific shell
+        let mut channel_source_command =
             if let Some(template) = &self.channel_cli.source_command {
                 CommandSpec::from_template(template.clone())
             } else {
                 self.channel.source.command.clone()
             };
+        if channel_source_command.shell.is_none() {
+            channel_source_command.shell = global_shell;
+        }
+
         let channel_source_entry_delimiter = self
             .channel_cli
             .source_entry_delimiter
             .or(self.channel.source.entry_delimiter);
         let channel_source_ansi =
             self.channel_cli.ansi || self.channel.source.ansi;
+        // Per-channel frecency setting (defaults to true, can be disabled per-channel)
+        let channel_frecency = self.channel.source.frecency;
         let channel_source_display = self
             .channel_cli
             .source_display
@@ -132,12 +145,19 @@ impl ConfigLayers {
             .as_ref()
             .or(self.channel.source.output.as_ref())
             .cloned();
-        let channel_preview_command = self
+
+        // Build preview command and apply global shell if no channel-specific shell
+        let mut channel_preview_command = self
             .channel_cli
             .preview_command
             .as_ref()
             .map(|t| CommandSpec::from_template(t.clone()))
             .or(self.channel.preview.as_ref().map(|p| p.command.clone()));
+        if let Some(ref mut cmd) = channel_preview_command
+            && cmd.shell.is_none()
+        {
+            cmd.shell = global_shell;
+        }
         let channel_preview_offset =
             self.channel_cli.preview_offset.clone().or(
                 if let Some(preview) = &self.channel.preview {
@@ -479,15 +499,17 @@ impl ConfigLayers {
             default_channel,
             history_size,
             global_history,
+            frecency_max_entries,
             working_directory,
             autocomplete_prompt,
+            shell: global_shell,
             // matcher configuration
             exact_match,
             select_1,
             take_1,
             take_1_fast,
             input,
-            sort_results,
+            no_sort,
 
             // Bindings
             input_map,
@@ -559,6 +581,8 @@ impl ConfigLayers {
             channel_preview_cached,
             // actions
             channel_actions,
+            // frecency
+            channel_frecency,
         }
     }
 }
@@ -576,15 +600,19 @@ pub struct MergedConfig {
     pub default_channel: String,
     pub history_size: usize,
     pub global_history: bool,
+    pub frecency_max_entries: usize,
     pub working_directory: Option<PathBuf>,
     pub autocomplete_prompt: Option<String>,
+    /// Global shell for command execution (from base config).
+    /// Already applied to `channel_source_command` and `channel_preview_command`.
+    pub shell: Option<Shell>,
     // matcher configuration
     pub exact_match: bool,
     pub select_1: bool,
     pub take_1: bool,
     pub take_1_fast: bool,
     pub input: Option<String>,
-    pub sort_results: bool,
+    pub no_sort: bool,
 
     // Bindings
     pub input_map: InputMap,
@@ -654,4 +682,6 @@ pub struct MergedConfig {
     pub channel_preview_offset: Option<Template>,
     pub channel_preview_cached: bool,
     pub channel_actions: FxHashMap<String, ActionSpec>,
+    /// Whether frecency is enabled for the current channel (per-channel override)
+    pub channel_frecency: bool,
 }

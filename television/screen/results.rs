@@ -1,13 +1,14 @@
 use crate::{
     channels::entry::Entry,
     config::ui::{BorderType, Padding},
+    event::Key,
     screen::{colors::Colorscheme, layout::InputPosition, result_item},
 };
 use anyhow::Result;
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
-    prelude::Style,
+    prelude::{Span, Style},
     text::Line,
     widgets::{Block, Borders, ListState, Padding as RatatuiPadding},
 };
@@ -26,7 +27,32 @@ pub fn draw_results_list(
     results_panel_border_type: &BorderType,
     results_panel_header: &Option<String>,
     merge_input_and_results: bool,
+    source_index: usize,
+    source_count: usize,
+    cycle_key: Option<Key>,
 ) -> Result<()> {
+    let title = if source_count > 1 {
+        let mut spans = vec![Span::from(" Results ")];
+        let dots: String = (0..source_count)
+            .map(|i| if i == source_index { "●" } else { "○" })
+            .collect::<Vec<_>>()
+            .join(" ");
+        spans.push(Span::styled(
+            format!("⟨ {} ⟩", dots),
+            Style::default().fg(colorscheme.input.results_count_fg),
+        ));
+        if let Some(key) = cycle_key {
+            spans.push(Span::styled(
+                format!(" {}", key),
+                Style::default().fg(colorscheme.general.border_fg),
+            ));
+        }
+        spans.push(Span::from(" "));
+        Line::from(spans).alignment(Alignment::Center)
+    } else {
+        Line::from(" Results ").alignment(Alignment::Center)
+    };
+
     let mut results_block = Block::default()
         .style(
             Style::default()
@@ -43,9 +69,7 @@ pub fn draw_results_list(
                 );
             }
         } else {
-            results_block = results_block.title_top(
-                Line::from(" Results ").alignment(Alignment::Center),
-            );
+            results_block = results_block.title_top(title);
         }
     }
 
