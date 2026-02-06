@@ -323,6 +323,12 @@ impl ConfigLayers {
             .and_then(|ui| ui.results_panel.as_ref())
             .and_then(|rp| rp.header.clone())
             .or_else(|| self.base_config.ui.results_panel.header.clone());
+        let merge_input_and_results = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.merge_input_and_results)
+            .unwrap_or(self.base_config.ui.merge_input_and_results);
         let preview_panel_size = self
             .channel_cli
             .preview_size
@@ -530,6 +536,8 @@ impl ConfigLayers {
             results_panel_border_type,
             results_panel_padding,
             results_panel_header,
+            // fork-specific
+            merge_input_and_results,
             // preview panel
             preview_panel_size,
             preview_panel_header,
@@ -632,6 +640,8 @@ pub struct MergedConfig {
     pub results_panel_border_type: BorderType,
     pub results_panel_padding: Padding,
     pub results_panel_header: Option<String>,
+    // fork-specific
+    pub merge_input_and_results: bool,
     // preview panel
     pub preview_panel_size: u16,
     pub preview_panel_header: Option<Template>,

@@ -475,6 +475,9 @@ pub struct UiSpec {
     pub help_panel: Option<ui::HelpPanelConfig>,
     #[serde(default)]
     pub remote_control: Option<ui::RemoteControlConfig>,
+    // fork-specific
+    #[serde(default)]
+    pub merge_input_and_results: Option<bool>,
 }
 
 pub const DEFAULT_PROTOTYPE_NAME: &str = "files";
@@ -492,6 +495,7 @@ impl From<&crate::config::UiConfig> for UiSpec {
             status_bar: Some(config.status_bar.clone()),
             help_panel: Some(config.help_panel.clone()),
             remote_control: Some(config.remote_control.clone()),
+            merge_input_and_results: Some(config.merge_input_and_results),
         }
     }
 }

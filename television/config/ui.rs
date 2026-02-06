@@ -210,6 +210,10 @@ pub struct UiConfig {
     pub help_panel: HelpPanelConfig,
     pub remote_control: RemoteControlConfig,
 
+    // Fork-specific options
+    #[serde(default)]
+    pub merge_input_and_results: bool,
+
     // Theme color overrides
     #[serde(default)]
     pub theme_overrides: ThemeOverrides,
@@ -227,6 +231,7 @@ impl Default for UiConfig {
             results_panel: ResultsPanelConfig::default(),
             help_panel: HelpPanelConfig::default(),
             remote_control: RemoteControlConfig::default(),
+            merge_input_and_results: false,
             theme_overrides: ThemeOverrides::default(),
         }
     }

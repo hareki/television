@@ -388,6 +388,26 @@ impl Layout {
             }
         };
 
+        // When merge_input_and_results is enabled, combine the input
+        // and results rects into a single bounding rect. The merged
+        // drawing function will handle internal sub-splitting.
+        let (input, results) = if merged_config.merge_input_and_results {
+            let min_x = input.x.min(results.x);
+            let min_y = input.y.min(results.y);
+            let max_x = (input.x + input.width).max(results.x + results.width);
+            let max_y =
+                (input.y + input.height).max(results.y + results.height);
+            let merged = Rect::new(
+                min_x,
+                min_y,
+                max_x.saturating_sub(min_x),
+                max_y.saturating_sub(min_y),
+            );
+            (Rect::default(), merged)
+        } else {
+            (input, results)
+        };
+
         // the remote control is a centered popup
         let remote_control = if !merged_config.remote_disabled
             && mode == Mode::RemoteControl
