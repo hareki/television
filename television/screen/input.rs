@@ -127,15 +127,7 @@ pub fn draw_input_box(
 
     let result_count_block = Block::default();
     let result_count_paragraph = Paragraph::new(Span::styled(
-        format!(
-            " {} / {} ",
-            if results_count == 0 {
-                0
-            } else {
-                results_picker_state.selected().unwrap_or(0) + 1
-            },
-            results_count,
-        ),
+        format!(" {}/{} ", results_count, total_count),
         Style::default()
             .fg(colorscheme.input.results_count_fg)
             .italic(),
