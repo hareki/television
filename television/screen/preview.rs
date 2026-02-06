@@ -127,54 +127,60 @@ fn draw_content_outer_block(
     preview_count: usize,
     cycle_key: Option<Key>,
 ) -> Rect {
-    let (indicator, key_hint) = if preview_count > 1 {
-        let dots: String = (0..preview_count)
-            .map(|i| if i == preview_index { "●" } else { "○" })
-            .collect::<Vec<_>>()
-            .join(" ");
-        let hint = cycle_key.map(|k| format!(" {}", k)).unwrap_or_default();
-        (format!(" ⟨ {} ⟩", dots), hint)
-    } else {
-        (String::new(), String::new())
-    };
-    let indicator_len = u16::try_from(indicator.chars().count()).unwrap_or(0);
-    let key_hint_len = u16::try_from(key_hint.chars().count()).unwrap_or(0);
-
-    let mut preview_title_spans = vec![Span::from(SPACE)];
-    // preview header
-    preview_title_spans.push(Span::styled(
-        shrink_with_ellipsis(
-            &replace_non_printable_bulk(
-                preview_title,
-                &ReplaceNonPrintableConfig::default(),
-            )
-            .0,
-            rect.width.saturating_sub(4 + indicator_len + key_hint_len)
-                as usize,
-        ),
-        Style::default().fg(colorscheme.preview.title_fg).bold(),
-    ));
-
-    if preview_count > 1 {
-        preview_title_spans.push(Span::styled(
-            indicator,
-            Style::default().fg(colorscheme.input.results_count_fg),
-        ));
-        if !key_hint.is_empty() {
-            preview_title_spans.push(Span::styled(
-                key_hint,
-                Style::default().fg(colorscheme.general.border_fg),
-            ));
-        }
-    }
-    preview_title_spans.push(Span::from(SPACE));
-
     let mut block = Block::default();
-    block = block.title_top(
-        Line::from(preview_title_spans)
-            .alignment(Alignment::Center)
-            .style(Style::default().fg(colorscheme.preview.title_fg)),
-    );
+
+    // Only show title if preview_title is not empty
+    if !preview_title.is_empty() {
+        let (indicator, key_hint) = if preview_count > 1 {
+            let dots: String = (0..preview_count)
+                .map(|i| if i == preview_index { "●" } else { "○" })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let hint =
+                cycle_key.map(|k| format!(" {}", k)).unwrap_or_default();
+            (format!(" ⟨ {} ⟩", dots), hint)
+        } else {
+            (String::new(), String::new())
+        };
+        let indicator_len =
+            u16::try_from(indicator.chars().count()).unwrap_or(0);
+        let key_hint_len =
+            u16::try_from(key_hint.chars().count()).unwrap_or(0);
+
+        let mut preview_title_spans = vec![Span::from(SPACE)];
+        preview_title_spans.push(Span::styled(
+            shrink_with_ellipsis(
+                &replace_non_printable_bulk(
+                    preview_title,
+                    &ReplaceNonPrintableConfig::default(),
+                )
+                .0,
+                rect.width.saturating_sub(4 + indicator_len + key_hint_len)
+                    as usize,
+            ),
+            Style::default().fg(colorscheme.preview.title_fg).bold(),
+        ));
+
+        if preview_count > 1 {
+            preview_title_spans.push(Span::styled(
+                indicator,
+                Style::default().fg(colorscheme.input.results_count_fg),
+            ));
+            if !key_hint.is_empty() {
+                preview_title_spans.push(Span::styled(
+                    key_hint,
+                    Style::default().fg(colorscheme.general.border_fg),
+                ));
+            }
+        }
+        preview_title_spans.push(Span::from(SPACE));
+
+        block = block.title_top(
+            Line::from(preview_title_spans)
+                .alignment(Alignment::Center)
+                .style(Style::default().fg(colorscheme.preview.title_fg)),
+        );
+    }
 
     // preview footer
     if let Some(preview_footer) = preview_footer {
