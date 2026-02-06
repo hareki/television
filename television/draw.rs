@@ -207,6 +207,7 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
         &ctx.colorscheme,
         &ctx.config.results_panel_padding,
         &ctx.config.results_panel_border_type,
+        &ctx.config.results_panel_header,
         ctx.tv_state.channel_state.source_index,
         ctx.tv_state.channel_state.source_count,
         cycle_sources_key,
