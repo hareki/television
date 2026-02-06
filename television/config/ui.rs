@@ -48,6 +48,7 @@ pub struct StatusBarConfig {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Default)]
 #[serde(default)]
 pub struct ResultsPanelConfig {
+    pub header: Option<String>,
     pub border_type: BorderType,
     pub padding: Padding,
 }

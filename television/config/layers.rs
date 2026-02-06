@@ -316,6 +316,13 @@ impl ConfigLayers {
                 Some(self.channel.ui.as_ref()?.results_panel.as_ref()?.padding)
             })
             .unwrap_or(self.base_config.ui.results_panel.padding);
+        let results_panel_header = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.results_panel.as_ref())
+            .and_then(|rp| rp.header.clone())
+            .or_else(|| self.base_config.ui.results_panel.header.clone());
         let preview_panel_size = self
             .channel_cli
             .preview_size
@@ -522,6 +529,7 @@ impl ConfigLayers {
             // results panel
             results_panel_border_type,
             results_panel_padding,
+            results_panel_header,
             // preview panel
             preview_panel_size,
             preview_panel_header,
@@ -623,6 +631,7 @@ pub struct MergedConfig {
     // results panel
     pub results_panel_border_type: BorderType,
     pub results_panel_padding: Padding,
+    pub results_panel_header: Option<String>,
     // preview panel
     pub preview_panel_size: u16,
     pub preview_panel_header: Option<Template>,
