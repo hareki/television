@@ -9,6 +9,7 @@ use crate::{
     screen::{
         action_picker::draw_action_picker, colors::Colorscheme,
         help_panel::draw_help_panel, input::draw_input_box, layout::Layout,
+        merged_input_results::draw_merged_input_results,
         missing_requirements_popup::draw_missing_requirements_popup,
         preview::draw_preview_content_block,
         remote_control::draw_remote_control, results::draw_results_list,
@@ -192,43 +193,69 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
     let layout =
         Layout::build(area, &ctx.config, ctx.tv_state.mode, &ctx.colorscheme);
 
-    // results list
+    // results list + input
     let cycle_sources_key = ctx
         .config
         .input_map
         .get_key_for_action(&Action::CycleSources);
-    draw_results_list(
-        f,
-        layout.results,
-        &ctx.tv_state.results_picker.entries,
-        &ctx.tv_state.channel_state.selected_entries,
-        &mut ctx.tv_state.results_picker.relative_state.clone(),
-        ctx.config.input_bar_position,
-        &ctx.colorscheme,
-        &ctx.config.results_panel_padding,
-        &ctx.config.results_panel_border_type,
-        &ctx.config.results_panel_header,
-        ctx.tv_state.channel_state.source_index,
-        ctx.tv_state.channel_state.source_count,
-        cycle_sources_key,
-    )?;
 
-    draw_input_box(
-        f,
-        layout.input,
-        ctx.tv_state.results_picker.total_items,
-        ctx.tv_state.channel_state.total_count,
-        &ctx.tv_state.results_picker.input,
-        &ctx.tv_state.results_picker.state,
-        ctx.tv_state.channel_state.running,
-        &ctx.tv_state.channel_state.current_channel_name,
-        &ctx.colorscheme,
-        ctx.config.input_bar_position,
-        &ctx.config.input_bar_header,
-        &ctx.config.input_bar_padding,
-        &ctx.config.input_bar_border_type,
-        ctx.config.input_bar_prompt.as_ref(),
-    )?;
+    if ctx.config.merge_input_and_results {
+        draw_merged_input_results(
+            f,
+            layout.results,
+            ctx.tv_state.results_picker.total_items,
+            ctx.tv_state.channel_state.total_count,
+            &ctx.tv_state.results_picker.input,
+            &mut ctx.tv_state.results_picker.relative_state.clone(),
+            ctx.tv_state.channel_state.running,
+            &ctx.tv_state.channel_state.current_channel_name,
+            &ctx.tv_state.results_picker.entries,
+            &ctx.tv_state.channel_state.selected_entries,
+            ctx.tv_state.channel_state.source_index,
+            ctx.tv_state.channel_state.source_count,
+            cycle_sources_key,
+            &ctx.colorscheme,
+            ctx.config.input_bar_position,
+            &ctx.config.input_bar_header,
+            &ctx.config.input_bar_padding,
+            &ctx.config.input_bar_border_type,
+            ctx.config.input_bar_prompt.as_ref(),
+            &ctx.config.results_panel_padding,
+        )?;
+    } else {
+        draw_results_list(
+            f,
+            layout.results,
+            &ctx.tv_state.results_picker.entries,
+            &ctx.tv_state.channel_state.selected_entries,
+            &mut ctx.tv_state.results_picker.relative_state.clone(),
+            ctx.config.input_bar_position,
+            &ctx.colorscheme,
+            &ctx.config.results_panel_padding,
+            &ctx.config.results_panel_border_type,
+            &ctx.config.results_panel_header,
+            ctx.tv_state.channel_state.source_index,
+            ctx.tv_state.channel_state.source_count,
+            cycle_sources_key,
+        )?;
+
+        draw_input_box(
+            f,
+            layout.input,
+            ctx.tv_state.results_picker.total_items,
+            ctx.tv_state.channel_state.total_count,
+            &ctx.tv_state.results_picker.input,
+            &ctx.tv_state.results_picker.state,
+            ctx.tv_state.channel_state.running,
+            &ctx.tv_state.channel_state.current_channel_name,
+            &ctx.colorscheme,
+            ctx.config.input_bar_position,
+            &ctx.config.input_bar_header,
+            &ctx.config.input_bar_padding,
+            &ctx.config.input_bar_border_type,
+            ctx.config.input_bar_prompt.as_ref(),
+        )?;
+    }
 
     // status bar at the bottom
     if let Some(status_bar_area) = layout.status_bar {
