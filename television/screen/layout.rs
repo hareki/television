@@ -311,47 +311,59 @@ impl Layout {
 
                 let mut portrait_constraints: Vec<Constraint> = Vec::new();
 
-                match merged_config.input_bar_position {
-                    InputPosition::Top => {
-                        // Input bar is always the first chunk
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = 0;
+                if merged_config.merge_input_and_results {
+                    let merged = super::layout_ext::portrait_merged_constraints(
+                        merged_config.input_bar_position,
+                        preview_hidden,
+                    );
+                    portrait_constraints = merged.0;
+                    input_idx = merged.1;
+                    results_idx = merged.2;
+                    preview_idx = merged.3;
+                } else {
+                    match merged_config.input_bar_position {
+                        InputPosition::Top => {
+                            // Input bar is always the first chunk
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = 0;
 
-                        if preview_hidden {
-                            // only results
-                            portrait_constraints.push(Constraint::Fill(1));
-                            results_idx = 1;
-                            preview_idx = None;
-                        } else {
-                            // results then preview
+                            if preview_hidden {
+                                // only results
+                                portrait_constraints.push(Constraint::Fill(1));
+                                results_idx = 1;
+                                preview_idx = None;
+                            } else {
+                                // results then preview
+                                portrait_constraints
+                                    .push(Constraint::Percentage(100));
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                results_idx = 1;
+                                preview_idx = Some(2);
+                            }
+                        }
+                        InputPosition::Bottom => {
+                            // For bottom input bar we might put preview at the top if
+                            // present, then results, then input.
+                            if preview_hidden {
+                                preview_idx = None;
+                            } else {
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                preview_idx = Some(0);
+                            }
+
+                            // results (placeholder percentage)
                             portrait_constraints
                                 .push(Constraint::Percentage(100));
-                            portrait_constraints
-                                .push(Constraint::Percentage(0));
-                            results_idx = 1;
-                            preview_idx = Some(2);
-                        }
-                    }
-                    InputPosition::Bottom => {
-                        // For bottom input bar we might put preview at the top if
-                        // present, then results, then input.
-                        if preview_hidden {
-                            preview_idx = None;
-                        } else {
-                            portrait_constraints
-                                .push(Constraint::Percentage(0));
-                            preview_idx = Some(0);
-                        }
+                            results_idx = usize::from(!preview_hidden);
 
-                        // results (placeholder percentage)
-                        portrait_constraints.push(Constraint::Percentage(100));
-                        results_idx = usize::from(!preview_hidden);
-
-                        // finally the input bar
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = portrait_constraints.len() - 1;
+                            // finally the input bar
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = portrait_constraints.len() - 1;
+                        }
                     }
                 }
 
@@ -392,18 +404,7 @@ impl Layout {
         // and results rects into a single bounding rect. The merged
         // drawing function will handle internal sub-splitting.
         let (input, results) = if merged_config.merge_input_and_results {
-            let min_x = input.x.min(results.x);
-            let min_y = input.y.min(results.y);
-            let max_x = (input.x + input.width).max(results.x + results.width);
-            let max_y =
-                (input.y + input.height).max(results.y + results.height);
-            let merged = Rect::new(
-                min_x,
-                min_y,
-                max_x.saturating_sub(min_x),
-                max_y.saturating_sub(min_y),
-            );
-            (Rect::default(), merged)
+            super::layout_ext::merge_input_results_rects(input, results)
         } else {
             (input, results)
         };
