@@ -5,6 +5,7 @@ pub mod help_panel;
 pub mod input;
 pub mod keybindings;
 pub mod layout;
+pub mod layout_ext;
 pub mod logo;
 pub mod merged_input_results;
 pub mod missing_requirements_popup;
