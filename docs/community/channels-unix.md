@@ -1227,6 +1227,43 @@ mode = "execute"
 
 ---
 
+### *git-files*
+
+A channel to list the files currently tracked in the Git repository
+
+![tv running the git-files channel](../../assets/channels/git-files.png)
+**Requirements:** `git`, `bat`
+
+**Code:** *git-files.toml*
+
+```toml
+[metadata]
+name = "git-files"
+description = "A channel to list the files currently tracked in the Git repository"
+requirements = [ "git", "bat",]
+
+[source]
+command = "git ls-files $(git rev-parse --show-toplevel)"
+
+[preview]
+command = "bat -n --color=always '{}'"
+
+[keybindings]
+f12 = "actions:edit"
+
+[preview.env]
+BAT_THEME = "ansi"
+
+[actions.edit]
+description = "Opens the selected entries with the default editor (falls back to vim)"
+command = "${EDITOR:-vim} '{}'"
+mode = "execute"
+
+```
+
+
+---
+
 ### *git-log*
 
 A channel to select from git log entries
