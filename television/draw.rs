@@ -122,7 +122,7 @@ impl TvState {
 /// draw a frame.
 pub struct Ctx {
     pub tv_state: TvState,
-    pub config: MergedConfig,
+    pub config: Arc<MergedConfig>,
     pub colorscheme: Arc<Colorscheme>,
     pub app_metadata: Arc<AppMetadata>,
     pub instant: Instant,
@@ -132,7 +132,7 @@ pub struct Ctx {
 impl Ctx {
     pub fn new(
         tv_state: TvState,
-        config: MergedConfig,
+        config: Arc<MergedConfig>,
         colorscheme: Arc<Colorscheme>,
         app_metadata: Arc<AppMetadata>,
         instant: Instant,
