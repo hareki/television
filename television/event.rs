@@ -160,8 +160,12 @@ async fn poll_event(timeout: Duration) -> bool {
 
 fn flush_existing_events() {
     let mut counter = 0;
-    while let Ok(true) = crossterm::event::poll(Duration::from_millis(0)) {
-        if let Ok(crossterm::event::Event::Key(_)) = crossterm::event::read() {
+    // Use a non-zero timeout to catch in-flight terminal responses
+    // (e.g., OSC 11 background color query responses from editors like neovim).
+    // This is especially important when resuming after an external command in tmux,
+    // where response round-trips can take a few milliseconds.
+    while let Ok(true) = crossterm::event::poll(Duration::from_millis(50)) {
+        if crossterm::event::read().is_ok() {
             counter += 1;
         }
     }

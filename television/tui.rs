@@ -248,6 +248,13 @@ where
             execute!(backend, EnterAlternateScreen)?;
             self.terminal.clear()?;
         }
+        // Reset cursor shape to the terminal's default, clearing any stale
+        // cursor style left by external programs (e.g., neovim's block cursor
+        // not being properly restored through tmux).
+        execute!(
+            self.terminal.backend_mut(),
+            crossterm::cursor::SetCursorStyle::DefaultUserShape
+        )?;
         Ok(())
     }
 
