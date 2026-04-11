@@ -544,6 +544,7 @@ impl Into<InputColorscheme> for &Theme {
     fn into(self) -> InputColorscheme {
         InputColorscheme {
             input_fg: (&self.input_text_fg).into(),
+            text_fg: (&self.text_fg).into(),
             results_count_fg: (&self.result_count_fg).into(),
         }
     }

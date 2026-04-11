@@ -42,6 +42,7 @@ pub struct PreviewColorscheme {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputColorscheme {
     pub input_fg: Color,
+    pub text_fg: Color,
     pub results_count_fg: Color,
 }
 

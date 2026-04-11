@@ -97,7 +97,7 @@ pub fn draw_input_box(
     let arrow_block = Block::default();
     let arrow = Paragraph::new(Span::styled(
         format!("{} ", prompt.unwrap_or(&DEFAULT_PROMPT.to_string())),
-        Style::default().fg(colorscheme.input.input_fg).bold(),
+        Style::default().fg(colorscheme.input.input_fg),
     ))
     .block(arrow_block);
     f.render_widget(arrow, inner_input_chunks[0]);
@@ -111,9 +111,7 @@ pub fn draw_input_box(
         .block(interactive_input_block)
         .style(
             Style::default()
-                .fg(colorscheme.input.input_fg)
-                .bold()
-                .italic(),
+                .fg(colorscheme.input.text_fg),
         )
         .alignment(Alignment::Left);
     f.render_widget(input, inner_input_chunks[1]);

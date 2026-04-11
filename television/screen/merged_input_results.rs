@@ -168,7 +168,7 @@ pub fn draw_merged_input_results(
     f.render_widget(
         Paragraph::new(Span::styled(
             format!("{} ", prompt_str),
-            Style::default().fg(colorscheme.input.input_fg).bold(),
+            Style::default().fg(colorscheme.input.input_fg),
         )),
         input_chunks[0],
     );
@@ -181,9 +181,7 @@ pub fn draw_merged_input_results(
             .scroll((0, u16::try_from(scroll)?))
             .style(
                 Style::default()
-                    .fg(colorscheme.input.input_fg)
-                    .bold()
-                    .italic(),
+                    .fg(colorscheme.input.text_fg),
             )
             .alignment(Alignment::Left),
         input_chunks[1],
