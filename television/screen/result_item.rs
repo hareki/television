@@ -345,7 +345,7 @@ where
     }))
     .direction(list_direction)
     .highlight_style(
-        Style::default().bg(colorscheme.result_selected_bg).bold(),
+        Style::default().bg(colorscheme.result_selected_bg),
     )
     .highlight_symbol(POINTER_SYMBOL)
     .block(block)
