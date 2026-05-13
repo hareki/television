@@ -28,6 +28,7 @@ pub fn draw_results_list(
     results_panel_header: &Option<String>,
     source_index: usize,
     source_count: usize,
+    current_source_name: Option<&str>,
     cycle_key: Option<Key>,
 ) -> Result<()> {
     // None = use default, Some("") = hide, Some(text) = custom
@@ -48,7 +49,12 @@ pub fn draw_results_list(
             .map_or("Results", |h| h.as_str());
 
         let title = if source_count > 1 {
-            let mut spans = vec![Span::from(format!(" {} ", header_text))];
+            let mut spans = match current_source_name {
+                Some(name) => {
+                    vec![Span::from(" "), Span::from(name), Span::from(" ")]
+                }
+                None => vec![Span::from(format!(" {} ", header_text))],
+            };
             let dots: String = (0..source_count)
                 .map(|i| if i == source_index { "●" } else { "○" })
                 .collect::<Vec<_>>()
