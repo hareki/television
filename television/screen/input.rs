@@ -37,7 +37,7 @@ pub fn draw_input_box(
     config: &MergedConfig,
     colorscheme: &Colorscheme,
     input_state: &Input,
-    results_picker_state: &ListState,
+    _results_picker_state: &ListState,
     results_count: u32,
     total_count: u32,
     matcher_running: bool,
@@ -162,16 +162,9 @@ pub fn draw_input_box(
             .find(|line| line.width() <= count_width_budget)
             .unwrap_or_default()
     } else {
-        let selected_position = if results_count == 0 {
-            0
-        } else {
-            results_picker_state.selected().unwrap_or(0) + 1
-        };
         let line = Line::from(Span::styled(
-            format!(" {} / {} ", selected_position, results_count),
-            Style::default()
-                .fg(colorscheme.input.results_count_fg)
-                .italic(),
+            format!(" {}/{} ", results_count, total_count),
+            Style::default().fg(colorscheme.input.results_count_fg),
         ));
         if line.width() <= count_width_budget {
             line
@@ -203,7 +196,7 @@ pub fn draw_input_box(
         let arrow_block = Block::default();
         let arrow = Paragraph::new(Span::styled(
             format!("{} ", prompt.unwrap_or(&DEFAULT_PROMPT.to_string())),
-            Style::default().fg(colorscheme.input.input_fg).bold(),
+            Style::default().fg(colorscheme.input.input_fg),
         ))
         .block(arrow_block);
         f.render_widget(arrow, inner_input_chunks[0]);
@@ -213,16 +206,9 @@ pub fn draw_input_box(
     // keep 2 for borders and 1 for cursor
     let width = inner_input_chunks[1].width.max(3) - 3;
     let scroll = input_state.visual_scroll(width as usize);
-    // in minimal mode the query is left undecorated (terminal default
-    // foreground, i.e. white on most dark terminals)
-    let input_style = if minimal {
-        Style::default().bold()
-    } else {
-        Style::default()
-            .fg(colorscheme.input.input_fg)
-            .bold()
-            .italic()
-    };
+    // fork-specific: the query uses its own theme color, separate from
+    // the prompt symbol, without any bold/italic decoration
+    let input_style = Style::default().fg(colorscheme.input.text_fg);
     let input = Paragraph::new(input_state.value())
         .scroll((0, u16::try_from(scroll)?))
         .block(interactive_input_block)

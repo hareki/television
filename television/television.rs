@@ -482,7 +482,7 @@ impl Television {
                     step,
                     self.channel.result_count() as usize,
                     self.ui_state.layout.results.height.saturating_sub(
-                        self.merged_config.results_panel_chrome_height(),
+                        self.merged_config.channel_results_chrome_height(),
                     ) as usize,
                 );
             }
@@ -722,7 +722,7 @@ impl Television {
                 .results
                 .height
                 .saturating_sub(
-                    self.merged_config.results_panel_chrome_height(),
+                    self.merged_config.channel_results_chrome_height(),
                 )
                 .into();
 

@@ -43,6 +43,9 @@ pub struct PreviewColorscheme {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InputColorscheme {
     pub input_fg: Color,
+    /// Fork-specific: typed query text, kept separate from the prompt
+    /// symbol color (`input_fg`).
+    pub text_fg: Color,
     pub results_count_fg: Color,
     /// Multi-source indicator (source name + dots) next to the count.
     pub source_indicator_fg: Color,

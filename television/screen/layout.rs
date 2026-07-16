@@ -161,8 +161,6 @@ impl Layout {
         merged_config: &MergedConfig,
         mode: Mode,
     ) -> Self {
-        let dimensions = Dimensions::from(merged_config.ui_scale);
-
         // Reserve space for status bar if enabled
         let working_area = if merged_config.status_bar_hidden {
             area
@@ -175,8 +173,13 @@ impl Layout {
             }
         };
 
-        let main_block =
-            centered_rect(dimensions.x, dimensions.y, working_area);
+        // fork-specific: nvim-style popup geometry (see layout_ext)
+        let main_block = super::layout_ext::bordered_centered_rect(
+            merged_config.ui_scale,
+            merged_config.ui_min_width,
+            merged_config.ui_min_height,
+            working_area,
+        );
 
         // Use the entire main block since help bar is removed
         let main_rect = main_block;
@@ -208,6 +211,9 @@ impl Layout {
         // picker borrows the preview pane so the entry it applies to stays
         // visible in the results list
         let rc_takeover = mode == Mode::RemoteControl;
+        // fork-specific: the remote control takeover draws its own picker
+        // and input box, so merging only applies outside of it
+        let merge = merged_config.merge_input_and_results && !rc_takeover;
         let ap_takeover = mode == Mode::ActionPicker;
         // the help panel borrows the preview pane as well (except in
         // actions mode, where the actions picker already occupies it)
@@ -337,47 +343,62 @@ impl Layout {
 
                 let mut portrait_constraints: Vec<Constraint> = Vec::new();
 
-                match merged_config.input_bar_position {
-                    InputPosition::Top => {
-                        // Input bar is always the first chunk
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = 0;
+                if merge {
+                    // fork-specific: the merged panel carves the input bar
+                    // out internally, so no separate chunk is allocated
+                    let merged =
+                        super::layout_ext::portrait_merged_constraints(
+                            merged_config.input_bar_position,
+                            preview_hidden,
+                        );
+                    portrait_constraints = merged.0;
+                    input_idx = merged.1;
+                    results_idx = merged.2;
+                    preview_idx = merged.3;
+                } else {
+                    match merged_config.input_bar_position {
+                        InputPosition::Top => {
+                            // Input bar is always the first chunk
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = 0;
 
-                        if preview_hidden {
-                            // only results
-                            portrait_constraints.push(Constraint::Fill(1));
-                            results_idx = 1;
-                            preview_idx = None;
-                        } else {
-                            // results then preview
+                            if preview_hidden {
+                                // only results
+                                portrait_constraints.push(Constraint::Fill(1));
+                                results_idx = 1;
+                                preview_idx = None;
+                            } else {
+                                // results then preview
+                                portrait_constraints
+                                    .push(Constraint::Percentage(100));
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                results_idx = 1;
+                                preview_idx = Some(2);
+                            }
+                        }
+                        InputPosition::Bottom => {
+                            // For bottom input bar we might put preview at the top if
+                            // present, then results, then input.
+                            if preview_hidden {
+                                preview_idx = None;
+                            } else {
+                                portrait_constraints
+                                    .push(Constraint::Percentage(0));
+                                preview_idx = Some(0);
+                            }
+
+                            // results (placeholder percentage)
                             portrait_constraints
                                 .push(Constraint::Percentage(100));
-                            portrait_constraints
-                                .push(Constraint::Percentage(0));
-                            results_idx = 1;
-                            preview_idx = Some(2);
-                        }
-                    }
-                    InputPosition::Bottom => {
-                        // For bottom input bar we might put preview at the top if
-                        // present, then results, then input.
-                        if preview_hidden {
-                            preview_idx = None;
-                        } else {
-                            portrait_constraints
-                                .push(Constraint::Percentage(0));
-                            preview_idx = Some(0);
-                        }
+                            results_idx = usize::from(!preview_hidden);
 
-                        // results (placeholder percentage)
-                        portrait_constraints.push(Constraint::Percentage(100));
-                        results_idx = usize::from(!preview_hidden);
-
-                        // finally the input bar
-                        portrait_constraints
-                            .push(Constraint::Length(input_bar_height));
-                        input_idx = portrait_constraints.len() - 1;
+                            // finally the input bar
+                            portrait_constraints
+                                .push(Constraint::Length(input_bar_height));
+                            input_idx = portrait_constraints.len() - 1;
+                        }
                     }
                 }
 
@@ -414,6 +435,14 @@ impl Layout {
             }
         };
 
+        // fork-specific: when merging, hand the drawing code the bounding
+        // box of both areas via `results`; it sub-splits internally
+        let (input, results) = if merge {
+            super::layout_ext::merge_input_results_rects(input, results)
+        } else {
+            (input, results)
+        };
+
         // the actions picker and the help panel take the preview pane; the
         // pane rect moves from `preview_window` to the borrower
         let (preview_window, borrowed_pane) = if ap_takeover || help_takeover {
@@ -448,6 +477,9 @@ impl Layout {
 }
 
 /// helper function to create a centered rect using up certain percentage of the available rect `r`
+// fork-specific: superseded by `layout_ext::bordered_centered_rect`;
+// kept to minimise merge conflicts with upstream.
+#[allow(dead_code)]
 fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     let height = r.height.saturating_mul(percent_y) / 100;
     let width = r.width.saturating_mul(percent_x) / 100;
@@ -455,6 +487,9 @@ fn centered_rect(percent_x: u16, percent_y: u16, r: Rect) -> Rect {
     centered_rect_with_dimensions(&Dimensions::new(width, height), r)
 }
 
+// fork-specific: superseded by `layout_ext::bordered_centered_rect`;
+// kept to minimise merge conflicts with upstream.
+#[allow(dead_code)]
 fn centered_rect_with_dimensions(dimensions: &Dimensions, r: Rect) -> Rect {
     // Cut the given rectangle into three vertical pieces
     let popup_layout = layout::Layout::default()

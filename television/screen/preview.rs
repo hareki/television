@@ -145,48 +145,6 @@ fn draw_content_outer_block(
     separator: Option<Borders>,
     scroll_percent: Option<u8>,
 ) -> Rect {
-    let (indicator, key_hint) = if preview_count > 1 {
-        let dots: String = (0..preview_count)
-            .map(|i| if i == preview_index { "●" } else { "○" })
-            .collect::<Vec<_>>()
-            .join(" ");
-        let hint = cycle_key.map(|k| format!(" {}", k)).unwrap_or_default();
-        (format!(" ⟨ {} ⟩", dots), hint)
-    } else {
-        (String::new(), String::new())
-    };
-    let indicator_len = u16::try_from(indicator.chars().count()).unwrap_or(0);
-    let key_hint_len = u16::try_from(key_hint.chars().count()).unwrap_or(0);
-
-    let mut preview_title_spans = vec![Span::from(SPACE)];
-    // preview header
-    preview_title_spans.push(Span::styled(
-        shrink_with_ellipsis(
-            &replace_non_printable_bulk(
-                preview_title,
-                &ReplaceNonPrintableConfig::default(),
-            )
-            .0,
-            rect.width.saturating_sub(4 + indicator_len + key_hint_len)
-                as usize,
-        ),
-        Style::default().fg(colorscheme.preview.title_fg).bold(),
-    ));
-
-    if preview_count > 1 {
-        preview_title_spans.push(Span::styled(
-            indicator,
-            Style::default().fg(colorscheme.input.results_count_fg),
-        ));
-        if !key_hint.is_empty() {
-            preview_title_spans.push(Span::styled(
-                key_hint,
-                Style::default().fg(colorscheme.general.border_fg),
-            ));
-        }
-    }
-    preview_title_spans.push(Span::from(SPACE));
-
     // without a border to anchor them, titles read better left-aligned
     let title_alignment = if border_type.to_ratatui_border_type().is_some() {
         Alignment::Center
@@ -203,15 +161,66 @@ fn draw_content_outer_block(
     };
     let hairline_style = Style::default().fg(colorscheme.general.border_fg);
 
-    if embeds_into(Borders::TOP) {
-        preview_title_spans.insert(0, Span::styled("─", hairline_style));
-    }
+    let mut block = Block::default();
 
-    let mut block = Block::default().title_top(
-        Line::from(preview_title_spans)
-            .alignment(title_alignment)
-            .style(Style::default().fg(colorscheme.preview.title_fg)),
-    );
+    // fork-specific: an empty title means "no title row at all" (unless a
+    // multi-preview indicator still needs the space)
+    if !preview_title.is_empty() || preview_count > 1 {
+        let (indicator, key_hint) = if preview_count > 1 {
+            let dots: String = (0..preview_count)
+                .map(|i| if i == preview_index { "●" } else { "○" })
+                .collect::<Vec<_>>()
+                .join(" ");
+            let hint =
+                cycle_key.map(|k| format!(" {}", k)).unwrap_or_default();
+            (format!(" ⟨ {} ⟩", dots), hint)
+        } else {
+            (String::new(), String::new())
+        };
+        let indicator_len =
+            u16::try_from(indicator.chars().count()).unwrap_or(0);
+        let key_hint_len =
+            u16::try_from(key_hint.chars().count()).unwrap_or(0);
+
+        let mut preview_title_spans = vec![Span::from(SPACE)];
+        // preview header
+        preview_title_spans.push(Span::styled(
+            shrink_with_ellipsis(
+                &replace_non_printable_bulk(
+                    preview_title,
+                    &ReplaceNonPrintableConfig::default(),
+                )
+                .0,
+                rect.width.saturating_sub(4 + indicator_len + key_hint_len)
+                    as usize,
+            ),
+            Style::default().fg(colorscheme.preview.title_fg).bold(),
+        ));
+
+        if preview_count > 1 {
+            preview_title_spans.push(Span::styled(
+                indicator,
+                Style::default().fg(colorscheme.input.results_count_fg),
+            ));
+            if !key_hint.is_empty() {
+                preview_title_spans.push(Span::styled(
+                    key_hint,
+                    Style::default().fg(colorscheme.general.border_fg),
+                ));
+            }
+        }
+        preview_title_spans.push(Span::from(SPACE));
+
+        if embeds_into(Borders::TOP) {
+            preview_title_spans.insert(0, Span::styled("─", hairline_style));
+        }
+
+        block = block.title_top(
+            Line::from(preview_title_spans)
+                .alignment(title_alignment)
+                .style(Style::default().fg(colorscheme.preview.title_fg)),
+        );
+    }
 
     // borderless preview: dimmed scroll percentage on the right of the
     // title row, standing in for the scrollbar

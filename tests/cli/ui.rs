@@ -201,9 +201,11 @@ fn test_ui_scale() {
     .start()
     .unwrap();
 
-    // match the scaled results box top border (48 columns at 80% of 120)
+    // match the scaled results box top border: 80% of 120 sizes the inner
+    // area (96), the border adds 2 outside (fork-specific nvim-style
+    // geometry), and the 50/50 landscape split yields a 49-column box
     s.wait()
-        .text("╭─────────── Default ⟨ ● ○ ⟩ ctrl-s ───────────╮")
+        .text("╭─────────── Default ⟨ ● ○ ⟩ ctrl-s ────────────╮")
         .until()
         .unwrap();
 

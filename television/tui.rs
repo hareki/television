@@ -247,6 +247,13 @@ where
         if self.viewport == Viewport::Fullscreen {
             execute!(backend, EnterAlternateScreen)?;
             self.terminal.clear()?;
+            // Reset the cursor shape to the terminal's default, clearing any
+            // stale cursor style left by external programs (e.g., neovim's
+            // block cursor not being properly restored through tmux).
+            execute!(
+                self.terminal.backend_mut(),
+                cursor::SetCursorStyle::DefaultUserShape
+            )?;
         } else {
             // the minimal non-fullscreen UI has no prompt decoration; a
             // steady bar cursor marks the input position instead

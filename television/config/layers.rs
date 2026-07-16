@@ -225,6 +225,10 @@ impl ConfigLayers {
                 .and_then(|ui| ui.ui_scale)
                 .unwrap_or(self.base_config.ui.ui_scale),
         );
+        // fork-specific: minimum inner size of the centered UI rect
+        // (config-file only; no CLI flag, no channel-level override)
+        let ui_min_width = self.base_config.ui.min_width;
+        let ui_min_height = self.base_config.ui.min_height;
         let layout = self.channel_cli.layout.unwrap_or(
             self.channel
                 .ui
@@ -298,6 +302,19 @@ impl ConfigLayers {
                 Some(self.channel.ui.as_ref()?.results_panel.as_ref()?.padding)
             })
             .unwrap_or(self.base_config.ui.results_panel.padding);
+        let results_panel_header = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.results_panel.as_ref())
+            .and_then(|rp| rp.header.clone())
+            .or_else(|| self.base_config.ui.results_panel.header.clone());
+        let merge_input_and_results = self
+            .channel
+            .ui
+            .as_ref()
+            .and_then(|ui| ui.merge_input_and_results)
+            .unwrap_or(self.base_config.ui.merge_input_and_results);
         let preview_panel_size = self
             .channel_cli
             .preview_size
@@ -454,8 +471,9 @@ impl ConfigLayers {
         // 1-column left margin so the query doesn't sit flush against
         // the terminal edge, plus a blank line between the input and
         // the results (only for a borderless input bar: a border already
-        // provides both)
+        // provides both; the merged panel's separator line does too)
         if input_bar_border_type == BorderType::None
+            && !merge_input_and_results
             && self.channel_cli.input_padding.is_none()
             && input_bar_padding == Padding::default()
         {
@@ -547,6 +565,8 @@ impl ConfigLayers {
 
             // UI
             ui_scale,
+            ui_min_width,
+            ui_min_height,
             layout,
             theme,
             inline,
@@ -565,6 +585,9 @@ impl ConfigLayers {
             // results panel
             results_panel_border_type,
             results_panel_padding,
+            results_panel_header,
+            // fork-specific
+            merge_input_and_results,
             // preview panel
             preview_panel_size,
             preview_panel_header,
@@ -652,6 +675,9 @@ pub struct MergedConfig {
 
     // UI
     pub ui_scale: u16,
+    /// Fork-specific: minimum inner size (cells) of the main UI rect (0 = disabled).
+    pub ui_min_width: u16,
+    pub ui_min_height: u16,
     pub layout: Orientation,
     pub theme: String,
     pub inline: bool,
@@ -671,6 +697,11 @@ pub struct MergedConfig {
     // results panel
     pub results_panel_border_type: BorderType,
     pub results_panel_padding: Padding,
+    /// Fork-specific: None = default title, "" = no title, "text" = custom.
+    pub results_panel_header: Option<String>,
+    /// Fork-specific: draw the input bar and results list inside a single
+    /// shared panel, separated by a horizontal line.
+    pub merge_input_and_results: bool,
     // preview panel
     pub preview_panel_size: u16,
     pub preview_panel_header: Option<Template>,
@@ -743,6 +774,27 @@ impl MergedConfig {
             2
         };
         borders
+            + self.results_panel_padding.top
+            + self.results_panel_padding.bottom
+    }
+
+    /// Chrome height of the main (channel-mode) results viewport. When the
+    /// input bar is merged into the results panel, the shared rect also
+    /// contains the outer borders, the input row and the separator line.
+    pub fn channel_results_chrome_height(&self) -> u16 {
+        if !self.merge_input_and_results {
+            return self.results_panel_chrome_height();
+        }
+        let borders = if self.input_bar_border_type == BorderType::None {
+            0
+        } else {
+            2
+        };
+        borders
+            // input row
+            + 1 + self.input_bar_padding.top + self.input_bar_padding.bottom
+            // separator line
+            + 1
             + self.results_panel_padding.top
             + self.results_panel_padding.bottom
     }

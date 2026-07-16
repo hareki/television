@@ -12,6 +12,7 @@ use crate::{
         help_panel::draw_help_pane,
         input::{SourceIndicator, draw_input_box},
         layout::{Layout, pane_separator_side},
+        merged_input_results::draw_merged_input_results,
         missing_requirements_popup::draw_missing_requirements_popup,
         preview::draw_preview_content_block,
         results::{draw_minimal_picker_list, draw_results_list},
@@ -233,6 +234,22 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
                 .then_some(("channels", ctx.colorscheme.mode.remote_control)),
             None,
         )?;
+    } else if ctx.config.merge_input_and_results {
+        // fork-specific: input bar and results list share a single panel
+        draw_merged_input_results(
+            f,
+            layout.results,
+            &ctx.config,
+            &ctx.colorscheme,
+            &ctx.tv_state.results_picker.input,
+            &mut ctx.tv_state.results_picker.relative_state.clone(),
+            ctx.tv_state.results_picker.total_items,
+            ctx.tv_state.channel_state.total_count,
+            ctx.tv_state.channel_state.running,
+            &ctx.tv_state.channel_state.current_channel_name,
+            &ctx.tv_state.results_picker.entries,
+            &ctx.tv_state.channel_state.selected_entries,
+        )?;
     } else {
         // results list
         let cycle_sources_key = ctx
@@ -249,6 +266,7 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
             &ctx.colorscheme,
             &ctx.config.results_panel_padding,
             &ctx.config.results_panel_border_type,
+            ctx.config.results_panel_header.as_deref(),
             ctx.tv_state.channel_state.source_index,
             ctx.tv_state.channel_state.source_count,
             ctx.tv_state.channel_state.current_source_name.as_deref(),
@@ -305,10 +323,21 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
                 ctx.config.input_bar_position,
             )
         });
+        // fork-specific: an empty configured header means "no title at
+        // all", including the placeholder shown while a preview loads
+        let mut preview_state = ctx.tv_state.preview_state;
+        if ctx
+            .config
+            .preview_panel_header
+            .as_ref()
+            .is_some_and(|t| t.raw().is_empty())
+        {
+            preview_state.preview.title = String::new();
+        }
         draw_preview_content_block(
             f,
             preview_rect,
-            ctx.tv_state.preview_state,
+            preview_state,
             &ctx.colorscheme,
             &ctx.config.preview_panel_border_type,
             &ctx.config.preview_panel_padding,
