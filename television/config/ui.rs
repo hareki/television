@@ -47,6 +47,8 @@ pub struct StatusBarConfig {
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Default)]
 #[serde(default)]
 pub struct ResultsPanelConfig {
+    // fork-specific: None = default title, "" = no title, "text" = custom
+    pub header: Option<String>,
     pub border_type: BorderType,
     pub padding: Padding,
 }
@@ -208,6 +210,17 @@ pub struct UiConfig {
     pub help_panel: HelpPanelConfig,
     pub remote_control: RemoteControlConfig,
 
+    // Fork-specific options
+    #[serde(default)]
+    pub merge_input_and_results: bool,
+
+    /// Minimum inner size (cells) of the main UI rect; 0 = disabled.
+    /// The bordered footprint adds 2 cells per axis on top.
+    #[serde(default)]
+    pub min_width: u16,
+    #[serde(default)]
+    pub min_height: u16,
+
     // Theme color overrides
     #[serde(default)]
     pub theme_overrides: ThemeOverrides,
@@ -225,6 +238,9 @@ impl Default for UiConfig {
             results_panel: ResultsPanelConfig::default(),
             help_panel: HelpPanelConfig::default(),
             remote_control: RemoteControlConfig::default(),
+            merge_input_and_results: false,
+            min_width: 0,
+            min_height: 0,
             theme_overrides: ThemeOverrides::default(),
         }
     }
