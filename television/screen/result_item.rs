@@ -297,9 +297,7 @@ where
         )
     }))
     .direction(list_direction)
-    .highlight_style(
-        Style::default().bg(colorscheme.result_selected_bg).bold(),
-    )
+    .highlight_style(Style::default().bg(colorscheme.result_selected_bg))
     .highlight_symbol(highlight_symbol)
     .block(block)
 }
@@ -367,9 +365,7 @@ where
         Line::from(spans)
     }))
     .direction(list_direction)
-    .highlight_style(
-        Style::default().bg(colorscheme.result_selected_bg).bold(),
-    )
+    .highlight_style(Style::default().bg(colorscheme.result_selected_bg))
     .highlight_symbol("")
     .block(block)
 }

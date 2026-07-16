@@ -498,6 +498,9 @@ pub struct UiSpec {
     pub help_panel: Option<ui::HelpPanelConfig>,
     #[serde(default)]
     pub remote_control: Option<ui::RemoteControlConfig>,
+    // fork-specific
+    #[serde(default)]
+    pub merge_input_and_results: Option<bool>,
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
@@ -513,6 +516,8 @@ pub struct InputBarSpec {
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct ResultsPanelSpec {
+    // fork-specific: None = default title, "" = no title, "text" = custom
+    pub header: Option<String>,
     pub border_type: Option<BorderType>,
     pub padding: Option<Padding>,
 }

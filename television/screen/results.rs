@@ -28,22 +28,28 @@ pub fn draw_results_list(
     colorscheme: &Colorscheme,
     results_panel_padding: &Padding,
     results_panel_border_type: &BorderType,
+    results_panel_header: Option<&str>,
     source_index: usize,
     source_count: usize,
     current_source_name: Option<&str>,
     cycle_key: Option<Key>,
 ) -> Result<()> {
     let borderless = *results_panel_border_type == BorderType::None;
+    // fork-specific: None = default title, "" = no title, "text" = custom
+    let header_hidden = results_panel_header.is_some_and(str::is_empty);
+    let header_text = results_panel_header
+        .filter(|h| !h.is_empty())
+        .unwrap_or("Results");
     // Borderless results are rendered without any title line to keep the
     // display minimal (color-only).
-    let title = if borderless {
+    let title = if borderless || header_hidden {
         None
     } else if source_count > 1 {
         let mut spans = match current_source_name {
             Some(name) => {
                 vec![Span::from(" "), Span::from(name), Span::from(" ")]
             }
-            None => vec![Span::from(" Results ")],
+            None => vec![Span::from(format!(" {} ", header_text))],
         };
         let dots: String = (0..source_count)
             .map(|i| if i == source_index { "●" } else { "○" })
@@ -62,7 +68,10 @@ pub fn draw_results_list(
         spans.push(Span::from(" "));
         Some(Line::from(spans).alignment(Alignment::Center))
     } else {
-        Some(Line::from(" Results ").alignment(Alignment::Center))
+        Some(
+            Line::from(format!(" {} ", header_text))
+                .alignment(Alignment::Center),
+        )
     };
 
     let mut results_block = Block::default()
