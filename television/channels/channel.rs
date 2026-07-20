@@ -7,12 +7,12 @@ use crate::{
         prototypes::{CommandSpec, Template},
     },
     frecency::FrecencyHandle,
-    matcher::{Matcher, injector::Injector, matcher_threads},
+    matcher::{
+        Matcher, Notify, SortStrategy, injector::Injector, matcher_threads,
+    },
     utils::command::shell_command,
 };
-use nucleo::SortStrategy;
 use rustc_hash::{FxBuildHasher, FxHashSet};
-use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::process::Stdio;
 use std::sync::Arc;
@@ -57,32 +57,22 @@ impl<P: EntryProcessor> Channel<P> {
         processor: P,
         frecency: Option<(FrecencyHandle, String)>,
         is_stdin: bool,
+        notify: Notify,
     ) -> Self {
         let sort_strategy = if no_sort {
             SortStrategy::Index
         } else if let Some((frecency_handle, channel_name)) = frecency {
             let cache = frecency_handle.create_cache(channel_name);
-            SortStrategy::Custom(Box::new(move |m1, i1, m2, i2| {
-                let scores = cache.snapshot();
-                let key1 = P::frecency_key(&i1);
-                let key2 = P::frecency_key(&i2);
-                let f1 = scores.get(&key1);
-                let f2 = scores.get(&key2);
-
-                match (f1, f2) {
-                    (Some(s1), Some(s2)) => {
-                        s2.cmp(&s1).then_with(|| m2.score.cmp(&m1.score))
-                    }
-                    (Some(_), None) => Ordering::Less,
-                    (None, Some(_)) => Ordering::Greater,
-                    (None, None) => m2.score.cmp(&m1.score),
-                }
-            }))
+            SortStrategy::Hoisted {
+                table: Box::new(move || cache.table()),
+                key: Box::new(P::frecency_key),
+            }
         } else {
             SortStrategy::Score
         };
 
-        let matcher = Matcher::new(sort_strategy, matcher_threads());
+        let matcher =
+            Matcher::with_notify(sort_strategy, matcher_threads(), notify);
         let current_source_index = 0;
         Self {
             source_command,
@@ -165,17 +155,7 @@ impl<P: EntryProcessor> Channel<P> {
         self.matcher.find(pattern);
     }
 
-    /// Let the background matcher thread make progress.
-    ///
-    /// This is cheap and should be called frequently (e.g. every update cycle)
-    /// to keep the matcher responsive, even when results aren't being fetched.
-    pub fn tick(&mut self) {
-        self.matcher.tick();
-    }
-
     pub fn results(&mut self, num_entries: u32, offset: u32) -> Vec<Entry> {
-        self.matcher.tick();
-
         let results = self.matcher.results(num_entries, offset);
 
         // PERF: this could be preallocated and reused by the caller
@@ -209,20 +189,36 @@ impl<P: EntryProcessor> Channel<P> {
     }
 
     pub fn result_count(&self) -> u32 {
-        self.matcher.matched_item_count
+        self.matcher.matched_item_count()
     }
 
     pub fn total_count(&self) -> u32 {
-        self.matcher.total_item_count
+        self.matcher.total_item_count()
     }
 
     pub fn running(&self) -> bool {
-        self.matcher.status.running
+        self.matcher.running()
             || (self.crawl_handle.is_some()
                 && !self.crawl_handle.as_ref().unwrap().is_finished())
     }
 
-    pub fn shutdown(&self) {}
+    pub fn wait_for_idle(&self) {
+        self.matcher.wait_for_idle();
+    }
+
+    pub fn wait_for_idle_timeout(&self, timeout: Duration) {
+        self.matcher.wait_for_idle_timeout(timeout);
+    }
+
+    /// Stop the source: abort the reader task (which kills the source
+    /// process via `kill_on_drop`) and drop the store. Batches still in
+    /// flight are discarded by the matcher's generation check.
+    pub fn shutdown(&mut self) {
+        if let Some(handle) = self.crawl_handle.take() {
+            handle.abort();
+        }
+        self.matcher.restart();
+    }
 
     pub fn cycle_sources(&mut self) {
         if self.source_command.inner.len() > 1 {
@@ -276,7 +272,7 @@ pub async fn load_candidates<P: EntryProcessor>(
     command: CommandSpec,
     entry_delimiter: Option<char>,
     command_index: usize,
-    processor: P,
+    mut processor: P,
     injector: Injector<P::Data>,
 ) {
     debug!("Loading candidates from command: {:?}", command);
@@ -288,6 +284,9 @@ pub async fn load_candidates<P: EntryProcessor>(
     );
     std_command.stdout(Stdio::piped()).stderr(Stdio::piped());
     let mut child = TokioCommand::from(std_command)
+        // Kill the source process when the reader task is dropped (reload,
+        // channel switch, quit) instead of letting it run to completion
+        .kill_on_drop(true)
         .spawn()
         .expect("failed to execute process"); // FIXME: handle error
 
@@ -325,9 +324,9 @@ pub async fn load_candidates<P: EntryProcessor>(
                     Vec::with_capacity(BATCH_SIZE),
                 );
                 let inj = injector.clone();
-                let proc = processor.clone();
+                let mut proc = processor.clone();
                 flush_handles.spawn_blocking(move || {
-                    flush_batch(batch_to_flush, &inj, &proc, delimiter);
+                    flush_batch(batch_to_flush, &inj, &mut proc, delimiter);
                 });
                 produced_output = true;
                 last_flush = Instant::now();
@@ -339,9 +338,9 @@ pub async fn load_candidates<P: EntryProcessor>(
         // Flush any remaining entries in the batch
         if !batch.is_empty() {
             let inj = injector.clone();
-            let proc = processor.clone();
+            let mut proc = processor.clone();
             flush_handles.spawn_blocking(move || {
-                flush_batch(batch, &inj, &proc, delimiter);
+                flush_batch(batch, &inj, &mut proc, delimiter);
             });
             produced_output = true;
         }
@@ -353,14 +352,16 @@ pub async fn load_candidates<P: EntryProcessor>(
         if !produced_output {
             let tv_message =
                 "Command produced no output on stdout, checking stderr...";
-            processor.push_to_injector(tv_message.to_string(), &injector);
+            let (data, haystack) = processor.process(tv_message.to_string());
+            injector.push(data, haystack);
             let stderr = child.stderr.take().unwrap();
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
                 if line.trim().is_empty() {
                     continue;
                 }
-                processor.push_to_injector(line, &injector);
+                let (data, haystack) = processor.process(line);
+                injector.push(data, haystack);
             }
         }
     }
@@ -406,9 +407,9 @@ pub async fn load_stdin_candidates<P: EntryProcessor>(
             let batch_to_flush =
                 std::mem::replace(&mut batch, Vec::with_capacity(BATCH_SIZE));
             let inj = injector.clone();
-            let proc = processor.clone();
+            let mut proc = processor.clone();
             flush_handles.spawn_blocking(move || {
-                flush_batch(batch_to_flush, &inj, &proc, delimiter);
+                flush_batch(batch_to_flush, &inj, &mut proc, delimiter);
             });
             last_flush = Instant::now();
         }
@@ -418,9 +419,9 @@ pub async fn load_stdin_candidates<P: EntryProcessor>(
 
     if !batch.is_empty() {
         let inj = injector.clone();
-        let proc = processor.clone();
+        let mut proc = processor.clone();
         flush_handles.spawn_blocking(move || {
-            flush_batch(batch, &inj, &proc, delimiter);
+            flush_batch(batch, &inj, &mut proc, delimiter);
         });
     }
 
@@ -432,10 +433,12 @@ pub async fn load_stdin_candidates<P: EntryProcessor>(
 fn flush_batch<P: EntryProcessor>(
     batch: Vec<Vec<u8>>,
     injector: &Injector<P::Data>,
-    processor: &P,
+    processor: &mut P,
     delimiter: u8,
 ) {
-    // decode utf8 and filter empty/whitespace-only lines
+    // decode utf8, filter empty/whitespace-only lines and run the processor
+    // up front so the whole batch is pushed under a single injector call
+    let mut entries = Vec::with_capacity(batch.len());
     for mut bytes in batch {
         if bytes.is_empty() || bytes.iter().all(u8::is_ascii_whitespace) {
             continue;
@@ -444,9 +447,10 @@ fn flush_batch<P: EntryProcessor>(
             bytes.pop();
         }
         if let Ok(line) = String::from_utf8(bytes) {
-            processor.push_to_injector(line, injector);
+            entries.push(processor.process(line));
         }
     }
+    injector.push_batch(entries);
 }
 
 /// Channels can be in one of several modes depending on the source configuration.
@@ -537,6 +541,7 @@ impl ChannelKind {
         no_sort: bool,
         frecency: Option<(FrecencyHandle, String)>,
         is_stdin: bool,
+        notify: Notify,
     ) -> Self {
         match (source_ansi, source_display) {
             (false, None) => ChannelKind::Plain(Channel::new(
@@ -548,6 +553,7 @@ impl ChannelKind {
                 PlainProcessor,
                 frecency,
                 is_stdin,
+                notify,
             )),
             (true, None) => ChannelKind::Ansi(Channel::new(
                 source_command,
@@ -555,9 +561,10 @@ impl ChannelKind {
                 source_output,
                 supports_preview,
                 no_sort,
-                AnsiProcessor,
+                AnsiProcessor::new(),
                 frecency,
                 is_stdin,
+                notify,
             )),
             (_, Some(template)) => ChannelKind::Display(Channel::new(
                 source_command,
@@ -568,6 +575,7 @@ impl ChannelKind {
                 DisplayProcessor { template },
                 frecency,
                 is_stdin,
+                notify,
             )),
         }
     }
@@ -577,11 +585,11 @@ impl ChannelKind {
         load() -> (),
         reload() -> (),
         find(pattern: &str) -> (),
-        tick() -> (),
         results(num_entries: u32, offset: u32) -> Vec<Entry>,
         get_result(index: u32) -> Option<Entry>,
         toggle_selection(entry: &Entry) -> (),
         cycle_sources() -> (),
+        shutdown() -> (),
     );
 
     // Generate all immutable delegation methods
@@ -592,7 +600,8 @@ impl ChannelKind {
         result_count() -> u32,
         total_count() -> u32,
         running() -> bool,
-        shutdown() -> (),
+        wait_for_idle() -> (),
+        wait_for_idle_timeout(timeout: Duration) -> (),
         supports_preview() -> bool,
         reloading() -> bool,
         source_index() -> usize,
@@ -605,7 +614,7 @@ impl ChannelKind {
 mod tests {
     use super::*;
     use crate::channels::prototypes::SourceSpec;
-    use nucleo::SortStrategy;
+    use crate::utils::ansi::StyleRuns;
 
     const MATCHER_TEST_THREADS: usize = 1;
 
@@ -634,7 +643,7 @@ mod tests {
 
         // Check if the matcher has the expected results
         matcher.find("test");
-        matcher.tick();
+        matcher.wait_for_idle();
         let results = matcher.results(10, 0);
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].matched_string, "test1");
@@ -665,7 +674,7 @@ mod tests {
 
         // Check if the matcher has the expected results
         matcher.find("test");
-        matcher.tick();
+        matcher.wait_for_idle();
         let results = matcher.results(10, 0);
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].matched_string, "test1");
@@ -696,7 +705,7 @@ mod tests {
 
         // Check if the matcher has the expected results
         matcher.find("test");
-        matcher.tick();
+        matcher.wait_for_idle();
         let results = matcher.results(10, 0);
         assert_eq!(results.len(), 2);
         assert_eq!(results[0].matched_string, "test1");
@@ -728,7 +737,7 @@ mod tests {
 
         // Check if the matcher has the expected results
         matcher.find("");
-        matcher.tick();
+        matcher.wait_for_idle();
         let results = matcher.results(1000, 0);
         assert_eq!(results.len(), 1000);
         assert_eq!(results[0].matched_string, "1");
@@ -745,22 +754,24 @@ mod tests {
         )
         .unwrap();
 
-        let mut matcher =
-            Matcher::<String>::new(SortStrategy::Score, MATCHER_TEST_THREADS);
+        let mut matcher = Matcher::<StyleRuns>::new(
+            SortStrategy::Score,
+            MATCHER_TEST_THREADS,
+        );
         let injector = matcher.injector();
 
         load_candidates(
             source_spec.command,
             source_spec.entry_delimiter,
             0,
-            AnsiProcessor,
+            AnsiProcessor::new(),
             injector,
         )
         .await;
 
         // Check if the matcher has the expected results (ANSI codes should be stripped)
         matcher.find("test");
-        matcher.tick();
+        matcher.wait_for_idle();
         let results = matcher.results(10, 0);
         assert_eq!(results.len(), 3);
         assert_eq!(results[0].matched_string, "test1");

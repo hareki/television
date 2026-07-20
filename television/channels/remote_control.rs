@@ -5,11 +5,10 @@ use crate::{
         prototypes::{BinaryRequirement, ChannelPrototype},
     },
     event::Key,
-    matcher::Matcher,
+    matcher::{Matcher, Notify, SortStrategy},
     screen::result_item::ResultItem,
 };
 use anyhow::Result;
-use nucleo::SortStrategy;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone)]
@@ -85,8 +84,16 @@ pub struct RemoteControl {
 const REMOTE_NUM_THREADS: usize = 1;
 
 impl RemoteControl {
-    pub fn new(cable_channels: Cable, sort_alphabetically: bool) -> Self {
-        let matcher = Matcher::new(SortStrategy::Score, REMOTE_NUM_THREADS);
+    pub fn new(
+        cable_channels: Cable,
+        sort_alphabetically: bool,
+        notify: Notify,
+    ) -> Self {
+        let matcher = Matcher::with_notify(
+            SortStrategy::Score,
+            REMOTE_NUM_THREADS,
+            notify,
+        );
         let injector = matcher.injector();
 
         // Sort channels based on configuration
@@ -95,6 +102,8 @@ impl RemoteControl {
             channels.sort_by(|a, b| a.0.cmp(b.0));
         }
 
+        // Collect the entries up front so they can be pushed as a single batch
+        let mut entries = Vec::with_capacity(channels.len());
         for (channel_name, prototype) in channels {
             let channel_shortcut = prototype
                 .keybindings
@@ -117,10 +126,10 @@ impl RemoteControl {
                             })
                             .collect(),
                     );
-            let () = injector.push(cable_entry, |e, cols| {
-                cols[0] = e.channel_name.clone().into();
-            });
+            let haystack = cable_entry.channel_name.clone();
+            entries.push((cable_entry, haystack));
         }
+        injector.push_batch(entries);
         RemoteControl {
             matcher,
             cable_channels,
@@ -142,7 +151,6 @@ impl RemoteControl {
         num_entries: u32,
         offset: u32,
     ) -> Vec<CableEntry> {
-        self.matcher.tick();
         self.matcher
             .results(num_entries, offset)
             .into_iter()
@@ -156,15 +164,19 @@ impl RemoteControl {
     }
 
     pub fn result_count(&self) -> u32 {
-        self.matcher.matched_item_count
+        self.matcher.matched_item_count()
     }
 
     pub fn total_count(&self) -> u32 {
-        self.matcher.total_item_count
+        self.matcher.total_item_count()
     }
 
     pub fn running(&self) -> bool {
-        self.matcher.status.running
+        self.matcher.running()
+    }
+
+    pub fn wait_for_idle(&self) {
+        self.matcher.wait_for_idle();
     }
 
     pub fn shutdown(&self) {}

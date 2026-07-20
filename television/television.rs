@@ -16,6 +16,7 @@ use crate::{
     errors::os_error_exit,
     frecency::FrecencyHandle,
     input::convert_action_to_input_request,
+    matcher::Notify,
     picker::{Movement, Picker},
     previewer::{
         Config as PreviewerConfig, Preview, Previewer,
@@ -37,7 +38,7 @@ use anyhow::Result;
 use ratatui::layout::Rect;
 use rustc_hash::FxHashSet;
 use serde::{Deserialize, Serialize};
-use std::{fmt::Display, sync::Arc};
+use std::{fmt::Display, sync::Arc, time::Duration};
 use tokio::sync::mpsc::{
     UnboundedReceiver, UnboundedSender, unbounded_channel,
 };
@@ -103,6 +104,10 @@ pub struct Television {
     frecency: FrecencyHandle,
     /// Tracks whether the channel was running on the previous tick to reset ticks
     was_running: bool,
+    /// Callback handed to every matcher so that, when fresh results are
+    /// published, the app loop is woken to render them immediately instead
+    /// of waiting for the next periodic render tick.
+    notify: Notify,
     /// Popup shown when attempting to switch to a channel with missing requirements
     pub missing_requirements_popup: Option<MissingRequirementsPopup>,
 }
@@ -117,6 +122,13 @@ impl Television {
         cable_channels: Cable,
         frecency: FrecencyHandle,
     ) -> Self {
+        // The matchers call this whenever they publish fresh results, waking
+        // the app loop so the UI renders them without waiting for a tick.
+        let notify_tx = action_tx.clone();
+        let notify: Notify = Arc::new(move || {
+            let _ = notify_tx.send(Action::MatcherUpdated);
+        });
+
         let merged_config = {
             // this is to keep the outer merged config immutable
             let mut m = layered_config.merge();
@@ -168,6 +180,7 @@ impl Television {
             merged_config.no_sort,
             frecency_config,
             merged_config.is_stdin,
+            notify.clone(),
         );
 
         let app_metadata = AppMetadata::new(
@@ -208,6 +221,7 @@ impl Television {
             Some(RemoteControl::new(
                 cable_channels,
                 merged_config.remote_sort_alphabetically,
+                notify.clone(),
             ))
         };
 
@@ -235,6 +249,7 @@ impl Television {
             colorscheme: Arc::new(colorscheme),
             ticks: 0,
             was_running: true,
+            notify,
             ui_state: UiState::default(),
             frecency,
             missing_requirements_popup: None,
@@ -377,6 +392,7 @@ impl Television {
             self.merged_config.no_sort,
             frecency_config,
             false, // stdin only applies to the initial channel
+            self.notify.clone(),
         );
         self.was_running = true;
         self.channel.load();
@@ -597,6 +613,9 @@ const RENDERING_INTERVAL: u64 = 25;
 /// This ensures that the UI stays in sync with the channel
 /// state (loading indicator, updating results, etc.).
 const RENDERING_INTERVAL_FAST: u64 = 3;
+/// How long to wait for the matcher to finish before rendering after
+/// an input action.
+const INPUT_MATCHER_WAIT: Duration = Duration::from_millis(2);
 
 impl Television {
     /// This contains the logic to determine whether a render should be performed
@@ -610,6 +629,9 @@ impl Television {
             // more frequently if the channel is running
             || (self.channel.running()
                 && self.ticks.is_multiple_of(RENDERING_INTERVAL_FAST))
+            // as soon as the matcher publishes fresh results, so results
+            // appear immediately instead of on the next periodic tick
+            || matches!(action, Action::MatcherUpdated)
             // always render on input actions that modify the ui state
             || matches!(
                 action,
@@ -820,6 +842,7 @@ impl Television {
         self.action_picker = Some(ActionPicker::new(
             &self.merged_config.channel_actions,
             &action_keybindings,
+            self.notify.clone(),
         ));
     }
 
@@ -866,6 +889,10 @@ impl Television {
                 self.action_tx.send(Action::SelectAndExit)?;
             }
             Mode::RemoteControl => {
+                if let Some(rc) = self.remote_control.as_ref() {
+                    rc.wait_for_idle();
+                }
+                self.update_rc_picker_state();
                 if let Some(entry) = self.get_selected_cable_entry() {
                     // Check for missing requirements
                     let missing: Vec<String> = entry
@@ -1216,8 +1243,21 @@ impl Television {
     pub fn update(&mut self, action: &Action) -> Result<Option<Action>> {
         self.handle_action(action)?;
 
-        // Always let the background matcher make progress
-        self.channel.tick();
+        // If the matcher is running and we just performed an input action, wait
+        // X ms for the matcher to finish to avoid unnecessary renders
+        if self.mode == Mode::Channel
+            && self.channel.running()
+            && matches!(
+                action,
+                Action::AddInputChar(_)
+                    | Action::DeletePrevChar
+                    | Action::DeletePrevWord
+                    | Action::DeleteLine
+                    | Action::DeleteNextChar
+            )
+        {
+            self.channel.wait_for_idle_timeout(INPUT_MATCHER_WAIT);
+        }
 
         // When the channel transitions from running to stopped, reset ticks
         // to restart the fast-render window. This ensures newly loaded results
