@@ -75,10 +75,7 @@ pub fn draw_results_list(
     };
 
     let mut results_block = Block::default()
-        .style(
-            Style::default()
-                .bg(colorscheme.general.background.unwrap_or_default()),
-        )
+        .style(Style::default().bg(colorscheme.general.background))
         .padding(RatatuiPadding::from(*results_panel_padding));
     if let Some(title) = title {
         results_block = results_block.title_top(title);
@@ -135,10 +132,7 @@ pub fn draw_minimal_picker_list<T: result_item::ResultItem>(
     show_descriptions: bool,
 ) -> Result<()> {
     let block = Block::default()
-        .style(
-            Style::default()
-                .bg(colorscheme.general.background.unwrap_or_default()),
-        )
+        .style(Style::default().bg(colorscheme.general.background))
         .padding(RatatuiPadding::from(*padding));
 
     let list_direction = match input_bar_position {
