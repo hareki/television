@@ -54,10 +54,8 @@ pub fn draw_merged_input_results(
     // an empty header means "no header at all"
     let header = config.input_bar_header.as_deref().unwrap_or(channel_name);
 
-    let mut outer_block = Block::default().style(
-        Style::default()
-            .bg(colorscheme.general.background.unwrap_or_default()),
-    );
+    let mut outer_block = Block::default()
+        .style(Style::default().bg(colorscheme.general.background));
     if !header.is_empty() {
         outer_block = outer_block
             .title_position(match position {
@@ -226,10 +224,7 @@ pub fn draw_merged_input_results(
     // Borders are handled by the outer merged block; this inner block
     // only applies the results padding.
     let results_block = Block::default()
-        .style(
-            Style::default()
-                .bg(colorscheme.general.background.unwrap_or_default()),
-        )
+        .style(Style::default().bg(colorscheme.general.background))
         .padding(RatatuiPadding::from(*results_padding));
 
     let results_list = result_item::build_results_list(
