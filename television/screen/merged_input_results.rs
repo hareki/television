@@ -43,7 +43,7 @@ pub fn draw_merged_input_results(
     matcher_running: bool,
     channel_name: &str,
     entries: &[Entry],
-    selected_entries: &FxHashSet<Entry>,
+    selected: &FxHashSet<u32>,
 ) -> Result<()> {
     let position = config.input_bar_position;
     let input_padding = &config.input_bar_padding;
@@ -219,7 +219,7 @@ pub fn draw_merged_input_results(
         InputPosition::Top => ratatui::widgets::ListDirection::TopToBottom,
     };
 
-    let has_multi_select = !selected_entries.is_empty();
+    let has_multi_select = !selected.is_empty();
 
     // Borders are handled by the outer merged block; this inner block
     // only applies the results padding.
@@ -239,7 +239,7 @@ pub fn draw_merged_input_results(
         POINTER_SYMBOL,
         |entry| {
             if has_multi_select {
-                Some(selected_entries.contains(entry))
+                Some(selected.contains(&entry.index))
             } else {
                 None
             }
