@@ -15,6 +15,7 @@ use crate::{
 };
 use rustc_hash::FxHashMap;
 use std::path::PathBuf;
+use tracing::trace;
 
 /// Represents the different layers of configuration that make up the final
 /// merged configuration used by the application.
@@ -219,64 +220,56 @@ impl ConfigLayers {
             .and_then(|ui| ui.help_panel.as_ref())
             .is_none_or(|hp| hp.show_categories)
             && self.base_config.ui.help_panel.show_categories;
-        let input_bar_position = self.channel_cli.input_position.unwrap_or(
-            self.channel
-                .ui
-                .as_ref()
-                .and_then(|ui| ui.input_bar.as_ref())
-                .map_or(self.base_config.ui.input_bar.position, |ib| {
-                    ib.position
-                }),
-        );
 
-        // CLI > channel > base config fields
-        let ui_scale = self.channel_cli.ui_scale.unwrap_or(
-            self.channel
-                .ui
-                .as_ref()
-                .and_then(|ui| ui.ui_scale)
-                .unwrap_or(self.base_config.ui.ui_scale),
-        );
+        // CLI > channel > base config fields.
+        let channel_ui = self.channel.ui.as_ref();
+        let channel_input_bar =
+            channel_ui.and_then(|ui| ui.input_bar.as_ref());
+        let channel_results_panel =
+            channel_ui.and_then(|ui| ui.results_panel.as_ref());
+        let channel_preview_panel =
+            channel_ui.and_then(|ui| ui.preview_panel.as_ref());
+
+        let ui_scale = self
+            .channel_cli
+            .ui_scale
+            .or(channel_ui.and_then(|ui| ui.ui_scale))
+            .unwrap_or(self.base_config.ui.ui_scale);
         // fork-specific: minimum inner size of the centered UI rect
         // (config-file only; no CLI flag, no channel-level override)
         let ui_min_width = self.base_config.ui.min_width;
         let ui_min_height = self.base_config.ui.min_height;
-        let layout = self.channel_cli.layout.unwrap_or(
-            self.channel
-                .ui
-                .as_ref()
-                .and_then(|ui| ui.orientation)
-                .unwrap_or(self.base_config.ui.orientation),
-        );
+        let layout = self
+            .channel_cli
+            .layout
+            .or(channel_ui.and_then(|ui| ui.orientation))
+            .unwrap_or(self.base_config.ui.orientation);
+        let input_bar_position = self
+            .channel_cli
+            .input_position
+            .or(channel_input_bar.and_then(|ib| ib.position))
+            .unwrap_or(self.base_config.ui.input_bar.position);
         let input_bar_header = self
             .channel_cli
             .input_header
             .clone()
-            .or_else(|| {
-                self.channel.ui.as_ref()?.input_bar.as_ref()?.header.clone()
-            })
-            .or_else(|| self.base_config.ui.input_bar.header.clone());
+            .or_else(|| channel_input_bar?.header.clone())
+            .unwrap_or_else(|| self.base_config.ui.input_bar.header.clone());
         let input_bar_prompt = self
             .channel_cli
             .input_prompt
             .clone()
-            .or_else(|| {
-                self.channel.ui.as_ref()?.input_bar.as_ref()?.prompt.clone()
-            })
-            .or_else(|| self.base_config.ui.input_bar.prompt.clone());
+            .or_else(|| channel_input_bar?.prompt.clone())
+            .unwrap_or_else(|| self.base_config.ui.input_bar.prompt.clone());
         let input_bar_border_type = self
             .channel_cli
             .input_border
-            .or_else(|| {
-                Some(self.channel.ui.as_ref()?.input_bar.as_ref()?.border_type)
-            })
+            .or(channel_input_bar.and_then(|ib| ib.border_type))
             .unwrap_or(self.base_config.ui.input_bar.border_type);
         let mut input_bar_padding = self
             .channel_cli
             .input_padding
-            .or_else(|| {
-                Some(self.channel.ui.as_ref()?.input_bar.as_ref()?.padding)
-            })
+            .or(channel_input_bar.and_then(|ib| ib.padding))
             .unwrap_or(self.base_config.ui.input_bar.padding);
         let status_bar_disabled = self.global_cli.no_status_bar;
         let mut status_bar_hidden = if status_bar_disabled {
@@ -296,23 +289,12 @@ impl ConfigLayers {
         let results_panel_border_type = self
             .channel_cli
             .results_border
-            .or_else(|| {
-                Some(
-                    self.channel
-                        .ui
-                        .as_ref()?
-                        .results_panel
-                        .as_ref()?
-                        .border_type,
-                )
-            })
+            .or(channel_results_panel.and_then(|rp| rp.border_type))
             .unwrap_or(self.base_config.ui.results_panel.border_type);
         let mut results_panel_padding = self
             .channel_cli
             .results_padding
-            .or_else(|| {
-                Some(self.channel.ui.as_ref()?.results_panel.as_ref()?.padding)
-            })
+            .or(channel_results_panel.and_then(|rp| rp.padding))
             .unwrap_or(self.base_config.ui.results_panel.padding);
         let results_panel_header = self
             .channel
@@ -330,84 +312,43 @@ impl ConfigLayers {
         let preview_panel_size = self
             .channel_cli
             .preview_size
-            .or_else(|| {
-                Some(self.channel.ui.as_ref()?.preview_panel.as_ref()?.size)
-            })
+            .or(channel_preview_panel.and_then(|pp| pp.size))
             .unwrap_or(self.base_config.ui.preview_panel.size);
         let preview_panel_header = self
             .channel_cli
             .preview_header
             .clone()
-            .or_else(|| {
-                Some(
-                    self.channel
-                        .ui
-                        .as_ref()?
-                        .preview_panel
-                        .as_ref()?
-                        .header
-                        .as_ref()?
-                        .clone(),
-                )
-            })
+            .or_else(|| channel_preview_panel?.header.clone())
             .or_else(|| self.base_config.ui.preview_panel.header.clone());
         let preview_panel_footer = self
             .channel_cli
             .preview_footer
             .clone()
-            .or_else(|| {
-                self.channel
-                    .ui
-                    .as_ref()?
-                    .preview_panel
-                    .as_ref()?
-                    .footer
-                    .clone()
-            })
+            .or_else(|| channel_preview_panel?.footer.clone())
             .or_else(|| self.base_config.ui.preview_panel.footer.clone());
         let preview_panel_scrollbar = !self.channel_cli.hide_preview_scrollbar
-            && self
-                .channel
-                .ui
-                .as_ref()
-                .and_then(|ui| ui.preview_panel.as_ref())
-                .map_or(self.base_config.ui.preview_panel.scrollbar, |pp| {
-                    pp.scrollbar
-                });
+            && channel_preview_panel
+                .and_then(|pp| pp.scrollbar)
+                .unwrap_or(self.base_config.ui.preview_panel.scrollbar);
         let preview_panel_border_type = self
             .channel_cli
             .preview_border
-            .or_else(|| {
-                Some(
-                    self.channel
-                        .ui
-                        .as_ref()?
-                        .preview_panel
-                        .as_ref()?
-                        .border_type,
-                )
-            })
+            .or(channel_preview_panel.and_then(|pp| pp.border_type))
             .unwrap_or(self.base_config.ui.preview_panel.border_type);
         let mut preview_panel_padding = self
             .channel_cli
             .preview_padding
-            .or_else(|| {
-                Some(self.channel.ui.as_ref()?.preview_panel.as_ref()?.padding)
-            })
+            .or(channel_preview_panel.and_then(|pp| pp.padding))
             .unwrap_or(self.base_config.ui.preview_panel.padding);
-
-        // If the CLI sets word-wrap to true, we respect that
-        let preview_panel_word_wrap = if self.channel_cli.preview_word_wrap {
-            true
-        // Otherwise, we check the channel UI config
-        } else if let Some(ui) = self.channel.ui.as_ref()
-            && let Some(panel) = ui.preview_panel.as_ref()
-        {
-            panel.word_wrap
-        // And if no config is present, we check the base UI config
-        } else {
-            self.base_config.ui.preview_panel.word_wrap
-        };
+        // --preview-word-wrap can only turn word wrap on
+        let preview_panel_word_wrap = self.channel_cli.preview_word_wrap
+            || channel_preview_panel
+                .and_then(|pp| pp.word_wrap)
+                .unwrap_or(self.base_config.ui.preview_panel.word_wrap);
+        trace!(
+            "channel ui overrides: input_bar={:?} results_panel={:?} preview_panel={:?}",
+            channel_input_bar, channel_results_panel, channel_preview_panel
+        );
 
         let preview_panel_disabled =
             self.global_cli.no_preview || self.channel_cli.no_preview;
@@ -417,12 +358,7 @@ impl ConfigLayers {
             false // --show-preview forces visible
         } else {
             self.channel_cli.hide_preview
-                || self
-                    .channel
-                    .ui
-                    .as_ref()
-                    .and_then(|ui| ui.preview_panel.as_ref())
-                    .is_some_and(|pp| pp.hidden)
+                || channel_preview_panel.is_some_and(|pp| pp.hidden)
                 || self.base_config.ui.preview_panel.hidden
         };
         let help_panel_hidden = if self.channel_cli.show_help_panel {
@@ -694,8 +630,8 @@ pub struct MergedConfig {
     pub width: Option<u16>,
     // input bar
     pub input_bar_position: InputPosition,
-    pub input_bar_header: Option<String>,
-    pub input_bar_prompt: Option<String>,
+    pub input_bar_header: String,
+    pub input_bar_prompt: String,
     pub input_bar_border_type: BorderType,
     pub input_bar_padding: Padding,
     /// Show the channel name next to the result count (minimal UI preset).
@@ -783,7 +719,7 @@ impl MergedConfig {
 
     /// An empty input bar header means "no header line at all".
     pub fn input_bar_header_hidden(&self) -> bool {
-        self.input_bar_header.as_deref().is_some_and(str::is_empty)
+        self.input_bar_header.is_empty()
     }
 
     /// Number of vertical cells the results block chrome (borders + padding)
@@ -826,7 +762,7 @@ mod tests {
     use super::*;
     use crate::{
         cable::Cable,
-        channels::prototypes::UiSpec,
+        channels::prototypes::{PreviewPanelSpec, UiSpec},
         cli::{args::Cli, post_process},
     };
     use clap::Parser;
@@ -958,9 +894,8 @@ mod tests {
             assert_eq!(merged.input_bar_border_type, BorderType::None);
             assert_eq!(merged.results_panel_border_type, BorderType::None);
             assert_eq!(merged.preview_panel_border_type, BorderType::None);
-            assert_eq!(merged.input_bar_header.as_deref(), Some(""));
             assert!(merged.input_bar_header_hidden());
-            assert_eq!(merged.input_bar_prompt.as_deref(), Some(""));
+            assert!(merged.input_bar_prompt.is_empty());
             assert_eq!(merged.input_bar_padding, Padding::new(0, 1, 1, 0));
             assert_eq!(merged.results_panel_padding, Padding::new(0, 0, 1, 0));
             assert_eq!(merged.preview_panel_padding, Padding::new(1, 0, 0, 0));
@@ -984,7 +919,7 @@ mod tests {
         assert_eq!(merged.results_panel_border_type, BorderType::None);
         assert_eq!(merged.preview_panel_border_type, BorderType::None);
         assert!(merged.input_bar_header_hidden());
-        assert_eq!(merged.input_bar_prompt.as_deref(), Some(""));
+        assert!(merged.input_bar_prompt.is_empty());
         assert!(merged.input_bar_minimal);
         // ...but the status bar stays
         assert!(!merged.status_bar_hidden);
@@ -1024,8 +959,8 @@ mod tests {
         // channel) should still get the minimal borderless preview.
         let mut prototype = ChannelPrototype::new("test", "echo 1");
         prototype.ui = Some(UiSpec {
-            preview_panel: Some(crate::config::ui::PreviewPanelConfig {
-                size: 60,
+            preview_panel: Some(PreviewPanelSpec {
+                size: Some(60),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1044,8 +979,8 @@ mod tests {
         // but a channel explicitly picking a non-default border keeps it
         let mut prototype = ChannelPrototype::new("test", "echo 1");
         prototype.ui = Some(UiSpec {
-            preview_panel: Some(crate::config::ui::PreviewPanelConfig {
-                border_type: BorderType::Thick,
+            preview_panel: Some(PreviewPanelSpec {
+                border_type: Some(BorderType::Thick),
                 ..Default::default()
             }),
             ..Default::default()
@@ -1060,6 +995,33 @@ mod tests {
             },
         );
         assert_eq!(merged.preview_panel_border_type, BorderType::Thick);
+    }
+
+    #[test]
+    fn channel_panel_only_overrides_fields_it_sets() {
+        let mut config = Config::default();
+        config.ui.preview_panel.border_type = BorderType::Rounded;
+        config.ui.preview_panel.scrollbar = true;
+        let prototype: ChannelPrototype = toml::from_str(
+            r#"
+            [metadata]
+            name = "test"
+            [source]
+            command = "echo 1"
+            [ui.preview_panel]
+            size = 60
+            "#,
+        )
+        .unwrap();
+        let merged = merge_layers(
+            config,
+            prototype,
+            ChannelCli::default(),
+            GlobalCli::default(),
+        );
+        assert_eq!(merged.preview_panel_size, 60);
+        assert_eq!(merged.preview_panel_border_type, BorderType::Rounded);
+        assert!(merged.preview_panel_scrollbar);
     }
 
     #[test]
@@ -1081,7 +1043,7 @@ mod tests {
         );
         assert!(!merged.status_bar_hidden);
         assert_eq!(merged.preview_panel_border_type, BorderType::Rounded);
-        assert_eq!(merged.input_bar_header.as_deref(), Some("Custom"));
+        assert_eq!(merged.input_bar_header, "Custom");
         // fields the CLI didn't touch still get the preset
         assert_eq!(merged.results_panel_border_type, BorderType::None);
     }

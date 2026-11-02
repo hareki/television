@@ -1,9 +1,6 @@
 //! Subcommands: `--version`, `list-channels`, `init`.
 
-use std::{
-    io,
-    process::{Command, Stdio},
-};
+use std::{io, process::Stdio};
 
 use crate::common::*;
 
@@ -94,7 +91,7 @@ fn test_init_subcommand_invalid_shell_errors() {
 /// tv should exit cleanly rather than panicking.
 #[test]
 fn test_list_channels_broken_pipe() -> io::Result<()> {
-    let mut child = Command::new(TV_BIN_PATH)
+    let mut child = tv_command()
         .args(LOCAL_CONFIG_AND_CABLE)
         .args(["list-channels"])
         .stdout(Stdio::piped())
@@ -120,7 +117,7 @@ fn test_list_channels_broken_pipe() -> io::Result<()> {
 /// tv should exit cleanly rather than panicking.
 #[test]
 fn test_init_shell_broken_pipe() -> io::Result<()> {
-    let mut child = Command::new(TV_BIN_PATH)
+    let mut child = tv_command()
         .args(LOCAL_CONFIG_AND_CABLE)
         .args(["init", "zsh"])
         .stdout(Stdio::piped())

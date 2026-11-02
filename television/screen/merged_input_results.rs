@@ -6,7 +6,7 @@
 /// merge conflicts with upstream.
 use crate::{
     channels::entry::Entry,
-    config::{layers::MergedConfig, ui::DEFAULT_PROMPT},
+    config::layers::MergedConfig,
     screen::{
         colors::Colorscheme, constants::POINTER_SYMBOL, layout::InputPosition,
         result_item,
@@ -41,18 +41,17 @@ pub fn draw_merged_input_results(
     results_count: u32,
     total_count: u32,
     matcher_running: bool,
-    channel_name: &str,
     entries: &[Entry],
     selected: &FxHashSet<u32>,
 ) -> Result<()> {
     let position = config.input_bar_position;
     let input_padding = &config.input_bar_padding;
     let results_padding = &config.results_panel_padding;
-    let prompt = config.input_bar_prompt.as_ref();
+    let prompt = &config.input_bar_prompt;
 
     // ── outer block ─────────────────────────────────────────────
     // an empty header means "no header at all"
-    let header = config.input_bar_header.as_deref().unwrap_or(channel_name);
+    let header = &config.input_bar_header;
 
     let mut outer_block = Block::default()
         .style(Style::default().bg(colorscheme.general.background));
@@ -140,16 +139,12 @@ pub fn draw_merged_input_results(
     }
 
     // an empty prompt means "no prompt at all"
-    let prompt_len = prompt
-        .map(|p| {
-            if p.is_empty() {
-                0
-            } else {
-                u16::try_from(p.chars().count() + 1)
-                    .expect("Prompt length should fit in u16")
-            }
-        })
-        .unwrap_or(2);
+    let prompt_len = if prompt.is_empty() {
+        0
+    } else {
+        u16::try_from(prompt.chars().count() + 1)
+            .expect("Prompt length should fit in u16")
+    };
     let indicator_len: u16 = if matcher_running { 2 } else { 0 };
     let count_line = Line::from(Span::styled(
         format!(" {}/{} ", results_count, total_count),
@@ -173,7 +168,7 @@ pub fn draw_merged_input_results(
     if prompt_len > 0 {
         f.render_widget(
             Paragraph::new(Span::styled(
-                format!("{} ", prompt.unwrap_or(&DEFAULT_PROMPT.to_string())),
+                format!("{} ", prompt),
                 Style::default().fg(colorscheme.input.input_fg),
             )),
             input_chunks[0],

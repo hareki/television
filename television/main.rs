@@ -18,7 +18,7 @@ use television::{
     },
     config::{
         Config, ConfigEnv, get_config_dir, get_data_dir,
-        migration::{maybe_print_migration_notice, migrate_config},
+        migration_15_16::migrate_0_15_config_once,
     },
     errors::os_error_exit,
     gh::update_local_channels,
@@ -50,8 +50,11 @@ async fn main() -> Result<()> {
     // from the default) is honored when resolving channel-vs-path ambiguity in post_process.
     debug!("Loading configuration...");
     let config_file = raw_cli.config_file.as_deref().map(expand_tilde);
-    let base_config =
-        Config::new(&ConfigEnv::init()?, config_file.as_deref())?;
+    let config_env = ConfigEnv::init()?;
+    if config_file.is_none() {
+        migrate_0_15_config_once(&get_config_dir(), &get_data_dir());
+    }
+    let base_config = Config::new(&config_env, config_file.as_deref())?;
     Shell::set_binaries(base_config.application.shell_binaries.clone());
 
     let cable_dir = raw_cli
@@ -127,11 +130,6 @@ async fn main() -> Result<()> {
     }
     bufwriter.flush()?;
 
-    // one-time invitation to trim configs auto-written by older versions
-    if config_file.is_none() && stderr().is_terminal() {
-        maybe_print_migration_notice(&get_config_dir(), &get_data_dir());
-    }
-
     exit(0);
 }
 
@@ -177,13 +175,6 @@ pub fn handle_subcommand(
         }
         Command::UpdateChannels { force } => {
             update_local_channels(force)?;
-            exit(0);
-        }
-        Command::MigrateConfig => {
-            let report = migrate_config(&get_config_dir())?;
-            let mut out = stdout().lock();
-            writeln!(out, "Backed up config to {}", report.backup.display())?;
-            writeln!(out, "Done.")?;
             exit(0);
         }
     }

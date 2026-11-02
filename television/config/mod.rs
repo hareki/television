@@ -22,7 +22,7 @@ mod themes;
 
 pub mod keybindings;
 pub mod layers;
-pub mod migration;
+pub mod migration_15_16;
 pub mod shell_integration;
 pub mod ui;
 
@@ -209,9 +209,9 @@ impl Config {
             let user_cfg: Config = Self::load_user_config(&config_file)?;
             debug!("Loaded user configuration: {:?}", user_cfg);
 
-            // merge the user configuration with the default configuration
+            // merges shell integration / keybindings with defaults
             let final_cfg =
-                Self::merge_with_default(&default_config, user_cfg);
+                Self::merge_default_maps(&default_config, user_cfg);
 
             Ok(final_cfg)
         } else {
@@ -237,30 +237,32 @@ impl Config {
         Ok(user_cfg)
     }
 
-    fn merge_with_default(default: &Config, mut new: Config) -> Config {
+    fn merge_default_maps(default_config: &Config, mut new: Config) -> Config {
         // use default fallback channel as a fallback if user hasn't specified one
         if new.shell_integration.fallback_channel.is_empty() {
-            new.shell_integration
-                .fallback_channel
-                .clone_from(&default.shell_integration.fallback_channel);
+            new.shell_integration.fallback_channel.clone_from(
+                &default_config.shell_integration.fallback_channel,
+            );
         }
 
-        // merge shell integration commands with default commands
-        if new.shell_integration.commands.is_empty() {
-            new.shell_integration
-                .commands
-                .clone_from(&default.shell_integration.commands);
-        }
+        // merge default shell integration commands with new ones
+        let mut merged_commands =
+            default_config.shell_integration.commands.clone();
+        merged_commands.extend(new.shell_integration.commands.clone());
+        debug!("Merged shell integration commands: {:?}", merged_commands);
+        new.shell_integration.commands = merged_commands;
 
         // merge shell integration keybindings with default keybindings
         let mut merged_keybindings =
-            default.shell_integration.keybindings.clone();
+            default_config.shell_integration.keybindings.clone();
         merged_keybindings.extend(new.shell_integration.keybindings.clone());
         new.shell_integration.keybindings = merged_keybindings;
 
         // merge keybindings with default keybindings
-        let keybindings =
-            merge_keybindings(default.keybindings.clone(), &new.keybindings);
+        let keybindings = merge_keybindings(
+            default_config.keybindings.clone(),
+            &new.keybindings,
+        );
         new.keybindings = keybindings;
 
         Config {
@@ -269,10 +271,6 @@ impl Config {
             ui: new.ui,
             shell_integration: new.shell_integration,
         }
-    }
-
-    pub fn merge_channel_keybindings(&mut self, other: &Keybindings) {
-        self.keybindings = merge_keybindings(self.keybindings.clone(), other);
     }
 }
 
@@ -449,7 +447,7 @@ mod tests {
         default_config.ui.ui_scale = 40;
         default_config.ui.theme = "television".to_string();
         // the fixture sets an explicit prompt (the built-in default is none)
-        default_config.ui.input_bar.prompt = Some(">".to_string());
+        default_config.ui.input_bar.prompt = ">".to_string();
         // With new architecture, we add directly to the bindings map
         default_config.keybindings.insert(
             Key::new(KeyCode::Enter, KeyModifiers::CONTROL),
@@ -466,10 +464,7 @@ mod tests {
         assert_eq!(config.ui, default_config.ui);
         assert_eq!(
             config.shell_integration.commands,
-            [(&String::from("git add"), &String::from("git-diff"))]
-                .iter()
-                .map(|(k, v)| ((*k).clone(), (*v).clone()))
-                .collect()
+            default_config.shell_integration.commands
         );
         assert_eq!(
             config.shell_integration.keybindings,
@@ -498,14 +493,15 @@ mod tests {
         let config = Config::new(&config_env, None).unwrap();
 
         // Verify that input_prompt was loaded from user config
-        assert_eq!(config.ui.input_bar.prompt, Some("❯".to_string()));
+        assert_eq!(config.ui.input_bar.prompt, "❯");
     }
 
     #[test]
-    fn test_setting_user_shell_integration_triggers_overrides_default() {
+    fn test_user_shell_integration_triggers_are_merged_with_defaults() {
         let user_config = r#"
             [shell_integration.channel_triggers]
             "files" = ["some command"]
+            "dirs" = ["cat"]
         "#;
 
         let dir = tempdir().unwrap();
@@ -521,10 +517,14 @@ mod tests {
 
         let config = Config::new(&config_env, None).unwrap();
 
-        assert_eq!(
-            config.shell_integration.commands.iter().collect::<Vec<_>>(),
-            vec![(&String::from("some command"), &String::from("files"))]
-        );
+        let mut expected = default_config_from_file()
+            .unwrap()
+            .shell_integration
+            .commands;
+        expected.insert("some command".to_string(), "files".to_string());
+        expected.insert("cat".to_string(), "dirs".to_string());
+
+        assert_eq!(config.shell_integration.commands, expected);
     }
 
     #[test]

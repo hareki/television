@@ -7,15 +7,13 @@ use serde::{Deserialize, Serialize};
 
 pub const DEFAULT_UI_SCALE: u16 = 100;
 pub const DEFAULT_PREVIEW_SIZE: u16 = 50;
-pub const DEFAULT_PROMPT: &str = ">";
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash)]
 #[serde(default)]
 pub struct InputBarConfig {
     pub position: InputPosition,
-    pub header: Option<String>,
-    #[serde(default = "default_prompt")]
-    pub prompt: Option<String>,
+    pub header: String,
+    pub prompt: String,
     pub border_type: BorderType,
     pub padding: Padding,
 }
@@ -24,18 +22,12 @@ impl Default for InputBarConfig {
     fn default() -> Self {
         Self {
             position: InputPosition::default(),
-            // an empty header/prompt means "don't render it at all"
-            header: Some(String::new()),
-            prompt: Some(String::new()),
+            header: String::new(),
+            prompt: String::new(),
             border_type: BorderType::default(),
             padding: Padding::uniform(0),
         }
     }
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn default_prompt() -> Option<String> {
-    Some(String::new())
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Hash, Default)]

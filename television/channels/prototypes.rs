@@ -1,11 +1,11 @@
 use crate::cli::parse_source_entry_delimiter;
-use crate::config::ui::{InputBarConfig, ThemeOverrides};
+use crate::config::ui::{BorderType, Padding, ThemeOverrides};
 use crate::utils::shell::Shell;
 use crate::utils::strings::SPACE;
 use crate::{
     config::{Keybindings, ui},
     event::Key,
-    screen::layout::Orientation,
+    screen::layout::{InputPosition, Orientation},
 };
 use anyhow::Result;
 use rustc_hash::FxHashMap;
@@ -487,11 +487,11 @@ pub struct UiSpec {
     pub theme_overrides: ThemeOverrides,
     // Feature-specific configurations
     #[serde(default)]
-    pub input_bar: Option<InputBarConfig>,
+    pub input_bar: Option<InputBarSpec>,
     #[serde(default)]
-    pub preview_panel: Option<ui::PreviewPanelConfig>,
+    pub preview_panel: Option<PreviewPanelSpec>,
     #[serde(default)]
-    pub results_panel: Option<ui::ResultsPanelConfig>,
+    pub results_panel: Option<ResultsPanelSpec>,
     #[serde(default)]
     pub status_bar: Option<ui::StatusBarConfig>,
     #[serde(default)]
@@ -503,25 +503,39 @@ pub struct UiSpec {
     pub merge_input_and_results: Option<bool>,
 }
 
-pub const DEFAULT_PROTOTYPE_NAME: &str = "files";
-
-impl From<&crate::config::UiConfig> for UiSpec {
-    fn from(config: &crate::config::UiConfig) -> Self {
-        UiSpec {
-            ui_scale: Some(config.ui_scale),
-            orientation: Some(config.orientation),
-            theme: Some(config.theme.clone()),
-            theme_overrides: config.theme_overrides.clone(),
-            input_bar: Some(config.input_bar.clone()),
-            preview_panel: Some(config.preview_panel.clone()),
-            results_panel: Some(config.results_panel.clone()),
-            status_bar: Some(config.status_bar.clone()),
-            help_panel: Some(config.help_panel.clone()),
-            remote_control: Some(config.remote_control.clone()),
-            merge_input_and_results: Some(config.merge_input_and_results),
-        }
-    }
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+pub struct InputBarSpec {
+    pub position: Option<InputPosition>,
+    pub header: Option<String>,
+    pub prompt: Option<String>,
+    pub border_type: Option<BorderType>,
+    pub padding: Option<Padding>,
 }
+
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+pub struct ResultsPanelSpec {
+    // fork-specific: None = default title, "" = no title, "text" = custom
+    pub header: Option<String>,
+    pub border_type: Option<BorderType>,
+    pub padding: Option<Padding>,
+}
+
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+#[serde(default)]
+pub struct PreviewPanelSpec {
+    pub size: Option<u16>,
+    pub header: Option<Template>,
+    pub footer: Option<Template>,
+    pub scrollbar: Option<bool>,
+    pub border_type: Option<BorderType>,
+    pub padding: Option<Padding>,
+    pub word_wrap: Option<bool>,
+    pub hidden: bool,
+}
+
+pub const DEFAULT_PROTOTYPE_NAME: &str = "files";
 
 #[cfg(test)]
 mod tests {
@@ -673,11 +687,11 @@ mod tests {
         let ui = prototype.ui.unwrap();
         assert_eq!(ui.orientation, Some(Orientation::Landscape));
         assert_eq!(ui.ui_scale, Some(100));
-        assert_eq!(ui.preview_panel.as_ref().unwrap().size, 66);
+        assert_eq!(ui.preview_panel.as_ref().unwrap().size, Some(66));
         let input_bar = ui.input_bar.as_ref().unwrap();
-        assert_eq!(input_bar.position, InputPosition::Bottom);
+        assert_eq!(input_bar.position, Some(InputPosition::Bottom));
         assert_eq!(input_bar.header.as_ref().unwrap(), "Input: {}");
-        assert_eq!(input_bar.border_type, BorderType::Plain);
+        assert_eq!(input_bar.border_type, Some(BorderType::Plain));
         let preview_panel = ui.preview_panel.as_ref().unwrap();
         assert_eq!(
             preview_panel.header.as_ref().unwrap().raw(),
@@ -687,9 +701,12 @@ mod tests {
             preview_panel.footer.as_ref().unwrap().raw(),
             "Press 'q' to quit"
         );
-        assert_eq!(preview_panel.border_type, BorderType::Thick);
+        assert_eq!(preview_panel.border_type, Some(BorderType::Thick));
 
-        assert_eq!(ui.results_panel.unwrap().border_type, BorderType::None);
+        assert_eq!(
+            ui.results_panel.unwrap().border_type,
+            Some(BorderType::None)
+        );
 
         let keybindings = prototype.keybindings.unwrap();
         assert_eq!(
@@ -954,8 +971,10 @@ mod tests {
         assert_eq!(ui.ui_scale, Some(40));
         assert_eq!(
             ui.input_bar.as_ref().unwrap().border_type,
-            BorderType::None
+            Some(BorderType::None)
         );
+        // fields the channel doesn't set stay unset
+        assert!(ui.input_bar.as_ref().unwrap().prompt.is_none());
         assert!(ui.preview_panel.is_some());
         assert_eq!(
             ui.preview_panel

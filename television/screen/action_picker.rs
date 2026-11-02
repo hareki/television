@@ -69,7 +69,6 @@ pub fn draw_actions_pane(
         results_count,
         total_count,
         false,
-        "actions",
         // with no status bar, the picker hint stands in for the mode
         config
             .status_bar_hidden

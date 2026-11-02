@@ -244,6 +244,8 @@ mode = "execute"
     let cwd = std::env::current_dir().expect("failed to get cwd");
     let s = pt
         .run("bash")
+        .env("TELEVISION_DATA", TEST_DATA_DIR)
+        .env("TELEVISION_CONFIG", TEST_CONFIG_DIR)
         .args(&["-lc", &script])
         .size(DEFAULT_COLS, DEFAULT_ROWS)
         .cwd(cwd.to_str().expect("cwd is not valid utf-8"))
@@ -344,6 +346,8 @@ mode = "fork"
     let cwd = std::env::current_dir().expect("failed to get cwd");
     let s = pt
         .run("bash")
+        .env("TELEVISION_DATA", TEST_DATA_DIR)
+        .env("TELEVISION_CONFIG", TEST_CONFIG_DIR)
         .args(&["-lc", &script])
         .size(DEFAULT_COLS, DEFAULT_ROWS)
         .cwd(cwd.to_str().expect("cwd is not valid utf-8"))

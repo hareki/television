@@ -22,8 +22,6 @@ If `TELEVISION_CONFIG` is set, tv uses that directory instead (for example,
 
 **latest default config file: [config.toml](https://github.com/alexpasmantier/television/blob/main/.config/config.toml)**
 
-If you have an older config file, `tv migrate-config` trims machine-written defaults from it.
-
 ## Option reference
 
 ### General Settings

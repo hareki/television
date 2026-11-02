@@ -228,7 +228,6 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
             picker.total_items,
             picker.total_count,
             false,
-            "channels",
             // with no status bar, the picker hint stands in for the mode
             ctx.config
                 .status_bar_hidden
@@ -247,7 +246,6 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
             ctx.tv_state.results_picker.total_items,
             ctx.tv_state.channel_state.total_count,
             ctx.tv_state.channel_state.running,
-            &ctx.tv_state.channel_state.current_channel_name,
             &ctx.tv_state.results_picker.entries,
             &ctx.tv_state.channel_state.selected,
         )?;
@@ -284,7 +282,6 @@ pub fn draw(ctx: Ctx, f: &mut Frame<'_>, area: Rect) -> Result<Layout> {
             ctx.tv_state.results_picker.total_items,
             ctx.tv_state.channel_state.total_count,
             ctx.tv_state.channel_state.running,
-            &ctx.tv_state.channel_state.current_channel_name,
             // with no status bar, the channel name moves next to the count,
             // in the same color the status bar would use
             (minimal && ctx.config.status_bar_hidden).then(|| {

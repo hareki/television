@@ -3,6 +3,7 @@
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::process::Command;
 
 use phantom_test::{Phantom, Session, SessionBuilder};
 use television::cable::CABLE_DIR_NAME;
@@ -54,6 +55,11 @@ pub const TV_BIN_PATH: &str = match option_env!("TV_BIN_PATH") {
     None => "./target/debug/tv",
 };
 
+pub const TEST_DATA_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/target/tv-test-data");
+pub const TEST_CONFIG_DIR: &str =
+    concat!(env!("CARGO_MANIFEST_DIR"), "/target/tv-test-config");
+
 pub const LOCAL_CONFIG_AND_CABLE: &[&str] = &[
     "--cable-dir",
     DEFAULT_CABLE_DIR,
@@ -75,8 +81,17 @@ pub fn phantom() -> Phantom {
 pub fn tv(pt: &Phantom) -> SessionBuilder<'_> {
     let cwd = std::env::current_dir().expect("failed to get cwd");
     pt.run(TV_BIN_PATH)
+        .env("TELEVISION_DATA", TEST_DATA_DIR)
+        .env("TELEVISION_CONFIG", TEST_CONFIG_DIR)
         .size(DEFAULT_COLS, DEFAULT_ROWS)
         .cwd(cwd.to_str().expect("cwd is not valid utf-8"))
+}
+
+pub fn tv_command() -> Command {
+    let mut cmd = Command::new(TV_BIN_PATH);
+    cmd.env("TELEVISION_DATA", TEST_DATA_DIR)
+        .env("TELEVISION_CONFIG", TEST_CONFIG_DIR);
+    cmd
 }
 
 /// Build a tv session preconfigured with the given arguments.

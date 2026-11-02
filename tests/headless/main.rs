@@ -67,6 +67,9 @@ fn setup_app(
     let mut config = default_config_from_file().unwrap();
     // this speeds up the tests
     config.application.tick_rate = 100;
+    // for test history and frecency
+    config.application.data_dir =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/tv-test-data");
 
     let layered_config = ConfigLayers::new(
         config,

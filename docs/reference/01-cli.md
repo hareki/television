@@ -12,7 +12,6 @@ Commands:
   init             Initializes shell completion ("tv init zsh")
   completions      Generates standard shell tab-completion scripts for tv's various subcommands
   update-channels  Downloads the latest collection of channel prototypes from github and saves them to the local configuration directory
-  migrate-config   Trims machine-written defaults from your configuration file
   help             Print this message or the help of the given subcommand(s)
 
 Arguments:
@@ -127,8 +126,12 @@ Preview:
           
           This is enabled by default since most channels will benefit from it.
           
-          Set `cached = false` in the channel's [preview] section to disable caching.
-          Passing this flag overrides that setting and enables caching for this invocation.
+          Passing this flag overrides the current channel's settings.
+
+      --no-cache-preview
+          Disable caching of the preview command output for each entry.
+          
+          See `--cache-preview` for more information.
 
       --preview-offset <STRING>
           A preview line number offset template to use to scroll the preview to for each

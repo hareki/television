@@ -462,19 +462,26 @@ fn build_indices_matcher(
 /// Parse the query into pattern atoms, giving each one a typo budget when
 /// typo resistance is enabled. The budget only affects fuzzy atoms; literal
 /// atoms (`'`, `^`, `$`, `!`) always match without typos.
+///
+/// When an atom is entirely lowercase, we disable frizbee's `matching_case_bonus`.
 fn parse_patterns(
     pattern: &str,
     config: MatcherConfig,
 ) -> Vec<frizbee::Pattern> {
-    let patterns = frizbee::Pattern::parse_query(pattern);
-    if !config.typo_resistance {
-        return patterns;
-    }
-    patterns
+    frizbee::Pattern::parse_query(pattern)
         .into_iter()
-        .map(|pattern| {
-            let budget = typo_budget(&pattern.needle);
-            pattern.max_typos(Some(budget))
+        .map(|mut pattern| {
+            if !pattern.needle.chars().any(char::is_uppercase) {
+                pattern = pattern.scoring(Some(frizbee::Scoring {
+                    matching_case_bonus: 0,
+                    ..frizbee::Scoring::default()
+                }));
+            }
+            if config.typo_resistance {
+                let budget = typo_budget(&pattern.needle);
+                pattern = pattern.max_typos(Some(budget));
+            }
+            pattern
         })
         .collect()
 }
@@ -648,6 +655,21 @@ mod tests {
         tolerant.find("cnx");
         tolerant.wait_for_idle();
         assert_eq!(collect_ids(&mut tolerant), vec![1]);
+    }
+
+    /// A lowercase query doesn't favor entries that happen to be lowercase.
+    #[test]
+    fn lowercase_query_ignores_case_when_ranking() {
+        let items: Vec<(usize, String)> = vec![
+            (0, ".github/workflows/update_readme.yml".to_string()),
+            (1, "README.md".to_string()),
+        ];
+
+        let mut matcher: Matcher<usize> = Matcher::new(SortStrategy::Score, 2);
+        matcher.injector().push_batch(items);
+        matcher.find("readme");
+        matcher.wait_for_idle();
+        assert_eq!(collect_ids(&mut matcher), vec![1, 0]);
     }
 
     /// A promoted strategy backed by a fixed score table, keyed on the

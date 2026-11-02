@@ -1,5 +1,5 @@
 use crate::{
-    config::{layers::MergedConfig, ui::DEFAULT_PROMPT},
+    config::layers::MergedConfig,
     screen::{colors::Colorscheme, layout::InputPosition},
     utils::input::Input,
 };
@@ -41,8 +41,6 @@ pub fn draw_input_box(
     results_count: u32,
     total_count: u32,
     matcher_running: bool,
-    // shown as the header when the config doesn't set one
-    header_fallback: &str,
     // optional `· <hint>` suffix after the count in the given color (the
     // current channel or picker mode), shown when the status bar is hidden
     hint: Option<(&str, Color)>,
@@ -52,14 +50,11 @@ pub fn draw_input_box(
     let position = config.input_bar_position;
     let padding = &config.input_bar_padding;
     let border_type = &config.input_bar_border_type;
-    let prompt = config.input_bar_prompt.as_ref();
+    let prompt = &config.input_bar_prompt;
     // minimal UI: dimmed compact count and undecorated query
     let minimal = config.input_bar_minimal;
     // an empty header means "no header at all"
-    let header = config
-        .input_bar_header
-        .as_deref()
-        .unwrap_or(header_fallback);
+    let header = &config.input_bar_header;
     let mut input_block = Block::default()
         .style(Style::default().bg(colorscheme.general.background))
         .padding(RatatuiPadding::from(*padding));
@@ -94,17 +89,12 @@ pub fn draw_input_box(
     // split input block into 4 parts: prompt symbol, input, result count, indicator
     let indicator_len = if matcher_running { 2 } else { 0 };
     // an empty prompt means "no prompt at all"
-    let prompt_len = prompt
-        .as_ref()
-        .map(|p| {
-            if p.is_empty() {
-                0
-            } else {
-                u16::try_from(p.chars().count() + 1)
-                    .expect("Prompt length should fit in u16")
-            }
-        })
-        .unwrap_or(2);
+    let prompt_len = if prompt.is_empty() {
+        0
+    } else {
+        u16::try_from(prompt.chars().count() + 1)
+            .expect("Prompt length should fit in u16")
+    };
     // columns left for the count once the query field got its minimum
     let count_width_budget = input_block_inner
         .width
@@ -192,7 +182,7 @@ pub fn draw_input_box(
     if prompt_len > 0 {
         let arrow_block = Block::default();
         let arrow = Paragraph::new(Span::styled(
-            format!("{} ", prompt.unwrap_or(&DEFAULT_PROMPT.to_string())),
+            format!("{} ", prompt),
             Style::default().fg(colorscheme.input.input_fg),
         ))
         .block(arrow_block);

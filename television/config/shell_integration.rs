@@ -5,7 +5,7 @@ use crossterm::event::{KeyCode, KeyModifiers};
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, PartialEq)]
 #[serde(default)]
 pub struct ShellIntegrationConfig {
     /// {command: channel}
@@ -23,91 +23,20 @@ impl<'de> Deserialize<'de> for ShellIntegrationConfig {
         #[derive(Deserialize, Default)]
         #[serde(default)]
         struct DeSerHelper {
-            channel_triggers: Option<FxHashMap<String, Vec<String>>>,
-            fallback_channel: Option<String>,
-            keybindings: Option<FxHashMap<String, Key>>,
+            channel_triggers: FxHashMap<String, Vec<String>>,
+            fallback_channel: String,
+            keybindings: FxHashMap<String, Key>,
         }
 
         let helper = DeSerHelper::deserialize(deserializer)?;
 
-        let mut config = Self::default();
-
-        if let Some(triggers) = helper.channel_triggers {
-            let commands = hashmaps::invert_nested_hashmap(&triggers);
-            config.commands = commands;
-        }
-        if let Some(fallback) = helper.fallback_channel {
-            config.fallback_channel = fallback;
-        }
-        if let Some(keybindings) = helper.keybindings {
-            config.keybindings = keybindings;
-        }
-
-        Ok(config)
-    }
-}
-
-const DEFAULT_FALLBACK_CHANNEL: &str = "files";
-
-static DEFAULT_CHANNEL_TRIGGERS: &[(&str, &[&str])] = &[
-    ("alias", &["alias", "unalias"]),
-    ("env", &["export", "unset"]),
-    ("dirs", &["cd", "ls", "rmdir"]),
-    (
-        "files",
-        &[
-            "cat", "less", "head", "tail", "vim", "nano", "bat", "cp", "mv",
-            "rm", "touch", "chmod", "chown", "ln", "tar", "zip", "unzip",
-            "gzip", "gunzip", "xz",
-        ],
-    ),
-    ("git-diff", &["git add", "git restore"]),
-    (
-        "git-branch",
-        &[
-            "git checkout",
-            "git branch",
-            "git merge",
-            "git rebase",
-            "git pull",
-            "git push",
-            "git switch",
-        ],
-    ),
-    ("git-log", &["git log", "git show"]),
-    ("docker-images", &["docker run"]),
-    ("git-repos", &["nvim", "code", "hx", "git clone"]),
-];
-
-static DEFAULT_KEYBINDINGS: &[(&str, &str)] = &[
-    ("smart_autocomplete", "ctrl-t"),
-    ("command_history", "ctrl-r"),
-];
-
-impl Default for ShellIntegrationConfig {
-    fn default() -> Self {
-        let mut triggers: FxHashMap<String, Vec<String>> =
-            FxHashMap::default();
-        triggers.extend(DEFAULT_CHANNEL_TRIGGERS.iter().map(
-            |(channel, commands)| {
-                (
-                    (*channel).to_string(),
-                    commands
-                        .iter()
-                        .map(std::string::ToString::to_string)
-                        .collect(),
-                )
-            },
-        ));
-
-        Self {
-            commands: hashmaps::invert_nested_hashmap(&triggers),
-            fallback_channel: DEFAULT_FALLBACK_CHANNEL.to_string(),
-            keybindings: DEFAULT_KEYBINDINGS
-                .iter()
-                .map(|(name, key)| ((*name).to_string(), key.parse().unwrap()))
-                .collect(),
-        }
+        Ok(Self {
+            commands: hashmaps::invert_nested_hashmap(
+                &helper.channel_triggers,
+            ),
+            fallback_channel: helper.fallback_channel,
+            keybindings: helper.keybindings,
+        })
     }
 }
 
