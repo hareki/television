@@ -141,6 +141,7 @@ pub fn preview_pane_block(
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Layout {
+    pub canvas: Rect,
     pub results: Rect,
     pub input: Rect,
     pub preview_window: Option<Rect>,
@@ -158,7 +159,8 @@ impl Default for Layout {
     fn default() -> Self {
         Self::new(
             Rect::new(0, 0, 0, 100),
-            Rect::default(),
+            Rect::new(0, 0, 0, 100),
+            Rect::new(0, 0, 0, 1),
             None,
             None,
             None,
@@ -170,6 +172,7 @@ impl Default for Layout {
 impl Layout {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
+        canvas: Rect,
         results: Rect,
         input: Rect,
         preview_window: Option<Rect>,
@@ -178,6 +181,7 @@ impl Layout {
         status_bar: Option<Rect>,
     ) -> Self {
         Self {
+            canvas,
             results,
             input,
             preview_window,
@@ -497,6 +501,7 @@ impl Layout {
         };
 
         Self::new(
+            area,
             results,
             input,
             preview_window,
@@ -546,7 +551,7 @@ fn centered_rect_with_dimensions(dimensions: &Dimensions, r: Rect) -> Rect {
 /// Minimum dimensions each pane must end up with for the preview to be worth
 /// showing; below these the preview is automatically hidden so the results
 /// list stays usable (e.g. `--inline` in a handful of rows).
-const MIN_PREVIEW_HEIGHT: u16 = 8;
+const MIN_PREVIEW_HEIGHT: u16 = 4;
 const MIN_RESULTS_HEIGHT: u16 = 4;
 const MIN_PREVIEW_WIDTH: u16 = 25;
 const MIN_RESULTS_WIDTH: u16 = 30;
